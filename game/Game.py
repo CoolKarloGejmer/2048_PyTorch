@@ -62,11 +62,10 @@ class Game:
     def step(self, direction):
         state_before_move = self.game_array.copy()
         self.move(direction)
-        self.logger.debug(f"Move: {direction.name}")
 
         if numpy.array_equal(state_before_move, self.game_array):
-            self.logger.warning("Game state did not change, doing nothing")
-            return
+            self.logger.debug("Game state did not change, doing nothing")
+            return False
 
         self.number_of_moves += 1
         self.populate()
@@ -101,12 +100,14 @@ class Game:
             # in rows
             if (self.game_array[:,:-1] == self.game_array[:,1:]).any():
                 self.game_over = False
-                return
+                return False
             # in columns
             if (self.game_array[:-1,:] == self.game_array[1:,:]).any():
                 self.game_over = False
-                return
+                return False
 
             self.game_over = True
+            return True
         else:
             self.game_over = False
+            return False

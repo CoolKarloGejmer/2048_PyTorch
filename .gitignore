@@ -9,4 +9,5 @@ game/__pycache__
 agent/__pycache__
 
 #logs
-logs/
+logs/game.log
+logs/agent.log
