@@ -1,38 +1,29 @@
-import random
-from game import Game,Direction, add_row, move_row, row_check
-from numpy import asarray
+from game.Game import Game
+from game.Direction import Direction
 
-def gaming():
-    seed = None
-    random.seed(seed)
-    game = Game(dim=4, seed=seed)
-    # array = asarray([
-    #     [0,0,0,0],
-    #     [0,2,2,0],
-    #     [0,2,2,0],
-    #     [0,0,0,0]
-    # ])
-    # game.__setstate__(array)
-    game.print()
-    #while game.game_over != True:
-    for i in range(10):
-        move = random.randint(0,3)
-        game.step(Direction(move))
-        print(Direction(move).name)
-        game.print()
+move_dict = {Direction.UP: [0,'w'],Direction.RIGHT: [1,'d'],Direction.DOWN: [2,'s'],Direction.LEFT: [3,'a']}
+move_flat = [x for i in move_dict.values() for x in i]
+def get_direction(value):
+    for direction, vals in move_dict.items():
+        if value in vals:
+            return direction
+    return None
 
-
-def testing():
-    row = [0,2,2,0]
-    dir = Direction.LEFT
-    print(row, row_check(dir, row), "\n\n")
-    for i in range(2):
-        row = move_row(dir, row)
-        row = add_row(dir, row)
-        print( row, row_check(dir,row),"\n\n" )
+def game_input():
+    move=None
+    while move not in move_flat:
+        print("enter move:  ",end="")
+        move=input()
+    move = get_direction(move)
+    return move
 
 def main():
-    gaming()
+    game = Game()
+    game.print()
+    while not game.is_over():
+        move = game_input()
+        game.step(move)
+        game.printsc()
 
 if __name__ == "__main__":
     main()

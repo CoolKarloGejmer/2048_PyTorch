@@ -1,5 +1,12 @@
+#temp files
 PLAN.txt
 
+#IDE specific
 .idea
 
+#python specific
 game/__pycache__
+agent/__pycache__
+
+#logs
+logs/

@@ -1,80 +1,23 @@
-from enum import Enum
-
+from game.Helper import *
+from game.Direction import Direction
 import numpy
 import random
-
-class Direction(Enum):
-    UP = 0
-    RIGHT = 1
-    DOWN = 2
-    LEFT = 3
-
-# checks if row is solved or not
-def row_check(direction, row):
-    row = list(row)
-    #reverses the row so that the row is basically looked at from the left
-    if direction == Direction.RIGHT or direction == Direction.DOWN:
-        row.reverse()
-
-    #row is solved if everything is zero
-    if set(row) == set([0]):
-        return True
-
-    #checks if the row is solved from the left
-    for i in range(len(row)-1):
-        if row[i] == row[i+1]:
-            #if they are the same, is the first one 0
-            if row[i] == 0:
-                #if first one is 0, are all other numbers after it 0
-                if set(row[i::]) == set([0]):
-                    return True
-                return False
-            #
-            else:
-                return False
-        #if they are not the same, is the first one 0
-        elif row[i] == 0:
-            return False
-    return True
-
-# moves row in a direction
-def move_row (direction, row):
-    if direction == Direction.LEFT or direction == Direction.UP:
-        for i in range(len(row) - 1):
-            if row[i] == 0:
-                row[i] = row[i+1]
-                row[i+1] = 0
-
-    if direction == Direction.RIGHT or direction == Direction.DOWN:
-        for i in reversed(range(1,len(row))):
-            if row[i] == 0:
-                row[i] = row[i-1]
-                row[i-1] = 0
-    return row
-
-# does addition to row in direction according to game rules
-def add_row(direction, row):
-    score = 0
-    if direction == Direction.LEFT or direction == Direction.UP:
-        for i in range(len(row)-1):
-            if row[i] == row[i+1]:
-                row[i] *= 2
-                score += row[i]
-                row[i+1] = 0
-    if direction == Direction.RIGHT or direction == Direction.DOWN:
-        for i in reversed(range(1,len(row))):
-            if row[i] == row[i - 1]:
-                row[i] *= 2
-                score += row[i]
-                row[i - 1] = 0
-    return row, score
+import logging
 
 class Game:
-    def __init__(self,dim=4, seed = None):
+    def __init__(self,dim=4, seed = None, logger_name="game"):
         if dim < 3:
             dim = 3
         self.dim = dim
         self.seed = seed
+        self.logger = logging.getLogger("Game")
+        logging.basicConfig(
+            filename=f"./logs/{logger_name}.log",
+            level=logging.DEBUG,
+            format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+            datefmt='%d.%M.%Y. %H:%M:%S'
+        )
+
         self.game_array = numpy.zeros((dim,dim))
         self.score = 0
         self.number_of_moves = 0
@@ -82,13 +25,19 @@ class Game:
 
         self.populate()
 
+        self.logger.info("Game initialized")
+
     def __setstate__(self, state):
         self.game_array = state
 
     def print(self):
         print(f"Score: {self.score}\nNumber of moves:{self.number_of_moves}")
         print(self.game_array)
-        print("\n")
+
+    def printsc(self):
+        for i in range(self.dim*2):
+            print()
+        self.print()
 
     # populates the array with either 4 or 2
     # happens after a move
@@ -113,14 +62,15 @@ class Game:
     def step(self, direction):
         state_before_move = self.game_array.copy()
         self.move(direction)
+        self.logger.debug(f"Move: {direction.name}")
 
         if numpy.array_equal(state_before_move, self.game_array):
-            print("Same move, game state did not change, doing nothing")
+            self.logger.warning("Game state did not change, doing nothing")
             return
 
         self.number_of_moves += 1
         self.populate()
-        self.check_game_over()
+        self.is_over()
 
     # 1. performs one move (moving + adding)
     # 2. checks if solved,
@@ -134,10 +84,10 @@ class Game:
             self.game_array = self.game_array.transpose()
 
         for row_indx in range(self.dim):
-            row = move_row(direction, self.game_array[row_indx])
-            row,score = add_row(direction, self.game_array[row_indx])
+            move_row(direction, self.game_array[row_indx])
+            row, score = add_row(direction, self.game_array[row_indx])
             self.score += score
-            while row_check(direction, row) == False:
+            while not row_solved(direction, row):
                 row = move_row(direction, row)
                 row,score = add_row(direction, row)
                 self.score+=score
@@ -145,7 +95,7 @@ class Game:
         if direction == Direction.UP or direction == Direction.DOWN:
             self.game_array = self.game_array.transpose()
 
-    def check_game_over(self):
+    def is_over(self):
         if 0 not in self.game_array:
             # check if any moves are possible (checks if any number has an equal next to it)
             # in rows
