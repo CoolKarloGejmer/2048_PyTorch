@@ -11,3 +11,5 @@ agent/__pycache__
 #logs
 logs/game.log
 logs/agent.log
+
+runs/
