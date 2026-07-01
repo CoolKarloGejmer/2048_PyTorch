@@ -25,3 +25,9 @@ class Batch:
         else:
             for i in range(limit):
                 self.batch[i].print()
+
+    def clear(self):
+        self.batch: list[Memories] = []
+
+    def get_batch(self):
+        return self.batch

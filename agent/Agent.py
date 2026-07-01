@@ -1,5 +1,6 @@
 import torch
 import logging
+import numpy as np
 from game.Game import Game
 from game.Direction import Direction
 from agent.Memory import Memories
@@ -7,8 +8,6 @@ from agent.Batch import Batch
 
 class Agent:
     def __init__(self, game = None, dim = 4, seed = None, logger_name = "agent",  batch_size= 128 ,max_deltas = 7):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
         self.memories = Memories(max_memories = max_deltas)
         self.batch = Batch(batch_size = batch_size)
 
@@ -48,3 +47,35 @@ class Agent:
             self.game = Game(dim=self.dim,seed=None,logger_name=self.logger_name)
         else:
             self.game = game
+
+    def clear_batch(self):
+        self.batch.clear()
+
+    #converts data from batch to list of state / actions
+    #then converts them to torch.tensor-s for trainin the model
+    def get_data_tensors(self):
+        states = []
+        actions = []
+        deltas = []
+        for memories in self.get_batch():
+            mem = memories.memory_array[0]
+
+            states.append(mem.state0)
+            actions.append(mem.direction.value)
+            deltas.append(mem.delta)
+
+
+        #encountered warning "creating a tensor from numpy.ndarrays is very slow"
+        #recommended solution was to convert to numpy.ndarray first
+        states = np.array(states, dtype=np.float32)
+        states = torch.tensor(states, dtype=torch.float32)
+
+        actions_np = np.array(actions, dtype=np.int64)
+        actions = torch.tensor(actions, dtype=torch.long)
+        return states,actions,deltas
+
+    def get_batch(self):
+        return self.batch.get_batch()
+
+    def get_state(self):
+        return self.game.get_state()

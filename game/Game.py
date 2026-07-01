@@ -71,6 +71,8 @@ class Game:
         self.populate()
         self.is_over()
 
+        return None
+
     # 1. performs one move (moving + adding)
     # 2. checks if solved,
     # if not solved, recursively does moving and adding
@@ -111,3 +113,6 @@ class Game:
         else:
             self.game_over = False
             return False
+
+    def get_state(self):
+        return self.game_array
