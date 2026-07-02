@@ -7,9 +7,13 @@ PLAN.txt
 #python specific
 game/__pycache__
 agent/__pycache__
+launch/__pycahce__
+models/__pycahce__
 
 #logs
 logs/game.log
 logs/agent.log
 
+#models
 runs/
+models/trained/

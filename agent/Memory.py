@@ -2,6 +2,8 @@ from game.Direction import Direction
 from game.Helper import *
 
 class Memory:
+    __slots__ = ['state0', 'direction', 'delta']
+
     def __init__(self, state0 = None, direction = Direction, delta = 0):
         self.state0 = state0
         self.direction = direction
@@ -50,6 +52,8 @@ class Memory:
         return Memory(state_copy, self.direction, self.delta)
 
 class Memories:
+    __slots__ = ['memory_array', 'max_memories', 'delta_sum']
+
     def __init__(self, max_memories = 5):
         self.memory_array = []
         self.max_memories = max_memories

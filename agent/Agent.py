@@ -7,9 +7,12 @@ from agent.Memory import Memories
 from agent.Batch import Batch
 
 class Agent:
-    def __init__(self, game = None, dim = 4, seed = None, logger_name = "agent",  batch_size= 128 ,max_deltas = 7):
-        self.memories = Memories(max_memories = max_deltas)
-        self.batch = Batch(batch_size = batch_size)
+    def __init__(self, game = None, dim = 4, seed = None, logger_name = "agent",  batch_size= 128 ,max_deltas = 7, eval=False):
+        self.evaluation_mode = eval
+
+        if not eval:
+            self.memories = Memories(max_memories = max_deltas)
+            self.batch = Batch(batch_size = batch_size)
 
         self.dim = dim
         self.seed = seed
@@ -33,7 +36,7 @@ class Agent:
         delta = self.game.score
         state0 = self.game.game_array.copy()
 
-        if not self.game.step(direction):
+        if not self.game.step(direction) and self.evaluation_mode == False:
             delta = abs(delta-self.game.score)
             self.memories.put(state0, direction, delta)
             self.batch.append(memory_list = self.memories.copy())
@@ -41,7 +44,8 @@ class Agent:
     def new_game(self, game = None):
         self.logger.debug("Initializing new game")
 
-        self.memories.clear()
+        if not self.evaluation_mode:
+            self.memories.clear()
 
         if game is None:
             self.game = Game(dim=self.dim,seed=None,logger_name=self.logger_name)
@@ -58,20 +62,24 @@ class Agent:
         actions = []
         deltas = []
         for memories in self.get_batch():
-            mem = memories.memory_array[0]
+            if len(memories.memory_array) > 0:
+                mem = memories.memory_array[0]
 
-            states.append(mem.state0)
-            actions.append(mem.direction.value)
-            deltas.append(mem.delta)
+                states.append(mem.state0)
+                actions.append(mem.direction.value)
+                deltas.append(mem.delta)
 
+        if not states:
+            return torch.tensor([]), torch.tensor([], dtype=torch.long), []
 
         #encountered warning "creating a tensor from numpy.ndarrays is very slow"
         #recommended solution was to convert to numpy.ndarray first
         states = np.array(states, dtype=np.float32)
-        states = torch.tensor(states, dtype=torch.float32)
-
         actions_np = np.array(actions, dtype=np.int64)
+
+        states = torch.tensor(states, dtype=torch.float32)
         actions = torch.tensor(actions, dtype=torch.long)
+
         return states,actions,deltas
 
     def get_batch(self):

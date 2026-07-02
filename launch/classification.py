@@ -1,9 +1,13 @@
 import random
+import os
 from datetime import datetime
+
+import numpy as np
 
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.data import TensorDataset, DataLoader
 
 from models.modelV1 import ModelV1
 
@@ -27,6 +31,8 @@ class Classification:
         self.batch_size = 128
         # number of games agent is using to get the "best moves"
         self.num_games = 100
+        # number of moves looking back, used to calculate the value of the move
+        self.max_deltas = 7
 
         # parameter that decides how much the agent should explore(try random moves) or predict/decide on the move itself
         # big epsilon means a lot more randomness, range is 0.00 - 1.00
@@ -37,7 +43,7 @@ class Classification:
         self.momentum = 0.9
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
 
-        self.agent = Agent(batch_size=self.batch_size)
+        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas)
 
         self.writer = SummaryWriter(f'runs/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}')
 
@@ -45,62 +51,150 @@ class Classification:
     def main(self):
         for e in range(self.epochs):
             self.agent.clear_batch()
-            epsilon = ( self.epsilon ** e ) * ( self.epsilon * (1 - e/self.epochs) )
+            epsilon = self.epsilon * (0.95 ** e)
+
+            self.model.eval()
+
+            game = self.agent.game
 
             # getting training data from games
-            for i in range(self.num_games):
-                while not self.agent.game.is_over():
-                    if random.random() < epsilon:
-                        best_action = random.randint(0, 3)
-                    else:
-                        state = self.agent.get_state()
+            with torch.no_grad():
+                for i in range(self.num_games):
+                    while not game.is_over():
+                        if np.random.random() < epsilon:
+                            best_action = np.random.randint(0, 4)
+                        else:
+                            state = self.agent.get_state()
 
-                        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+                            state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
-                        log_probs = self.model(state_tensor)
+                            log_probs = self.model(state_tensor)
+                            best_action = log_probs.argmax().item()
 
-                        best_action = log_probs.argmax().item()
-
-                    self.agent.play(best_action)
-                self.agent.new_game()
-
-                #this is not necessary, only for visual feedback in console
-                print_step=int(self.num_games/4)
-                if i%print_step == 0 and e%2 == 0:
-                    print(".",end="")
+                        self.agent.play(best_action)
+                    self.agent.new_game()
+                    game = self.agent.game
 
             # training
+            self.model.train()
+
             self.agent.batch.shuffle()
             states, actions, deltas = self.agent.get_data_tensors()
 
-            #for idx,(states,actions) in enumerate(zip(states,actions)):
-            self.optimizer.zero_grad()
-            output = self.model(states)
-            loss = self.loss_fn(output,actions)
-            loss.backward()
-            self.optimizer.step()
+            states = states.to(self.device)
+            actions = actions.to(self.device)
 
-            predictions = output.argmax(dim=1)
-            correct = (predictions == actions).sum().item()
-            accuracy = correct / len(actions)
+            dataset = TensorDataset(states, actions)
+            dataloader = DataLoader(
+                dataset,
+                batch_size=32,
+                shuffle=True,
+                num_workers=4,
+                pin_memory=True if self.device.type == 'cuda' else False
+            )
 
-            if e%2 == 0:
-                print(f"Epoch {e + 1}, Loss: {loss.item():.4f}")
+            total_loss = 0
+            total_correct = 0
+            total_samples = 0
+
+            for batch_states, batch_actions in dataloader:
+                if self.device.type == 'cuda':
+                    batch_states = batch_states.to(self.device)
+                    batch_actions = batch_actions.to(self.device)
+
+                self.optimizer.zero_grad()
+                output = self.model(batch_states)
+                loss = self.loss_fn(output, batch_actions)
+                loss.backward()
+                self.optimizer.step()
+
+                total_loss += loss.item()
+                predictions = output.argmax(dim=1)
+                correct = (predictions == batch_actions).sum().item()
+                total_correct += correct
+                total_samples += len(batch_actions)
+
+            avg_loss = total_loss / len(dataloader)
+            accuracy = total_correct / total_samples
+
+            mean, avg = self.eval(epoch=e)
+
             self.write_to_tensorboard(
-                loss=loss,
+                loss=torch.tensor(avg_loss),
                 accuracy=accuracy,
+                avg=avg,
+                mean=mean,
                 epoch=e
             )
 
-            # for i in range(5):
-            #     print(states[i], end="  ")
-            #     print(Direction(actions[i]).name, end="  ")
-            #     print(deltas[i])
-            #     print("------------")
+            if e%5 == 0 and e != 0:
+                print(f"Epoch {e + 1}, Loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}, Mean score: {mean}, Avg score: {avg:.4f}")
+            else:
+                print('.', end=" ")
 
-    def write_to_tensorboard(self, loss=None, accuracy=None, epoch=int):
+        self.save_model()
+
+    def write_to_tensorboard(self, loss=None, accuracy=None, avg=None, mean=None,epoch=int):
         if loss is not None:
             self.writer.add_scalar('Loss/train', loss.item(), epoch)
 
         if accuracy is not None:
             self.writer.add_scalar('Accuracy/train', accuracy, epoch)
+
+        if mean is not None:
+            self.writer.add_scalar('Mean_score/train', mean, epoch)
+
+        if avg is not None:
+            self.writer.add_scalar('Avg_score/train', avg, epoch)
+
+    def save_model(self):
+        model_class_name = self.model.__class__.__name__
+
+        save_dir = "models/trained"
+        os.makedirs(save_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"{model_class_name}_{timestamp}.pt"
+
+        save_path = os.path.join(save_dir, filename)
+
+        torch.save(self.model.state_dict(), save_path)
+
+        print(f"Model saved to: {save_path}")
+
+    # function for getting avg and mean scores from current model
+    def eval(self, epoch: int):
+        from game.Direction import Direction
+        num_games_for_eval = 20
+
+        avg_score = []
+
+        agent = Agent(eval=True)
+        game = agent.game
+
+        with torch.no_grad():
+            for i in range(num_games_for_eval):
+                stall_counter = 0
+                while not game.is_over():
+                    state = agent.get_state()
+                    state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+
+                    log_probs = self.model(state_tensor)
+                    best_action = log_probs.argmax().item()
+
+                    state0 = agent.get_state().copy()
+                    agent.play(best_action)
+                    if np.array_equal(state0, agent.get_state()):
+                        stall_counter+=1
+                        agent.play(np.random.randint(0,4))
+                    else:
+                        stall_counter = 0
+                    if stall_counter > 20:
+                        agent.logger.warning("Stalled, moving on to new game")
+                        break
+
+                avg_score.append(game.score)
+                agent.new_game()
+                game = agent.game
+
+        return avg_score[int(num_games_for_eval/2)], sum(avg_score) / num_games_for_eval

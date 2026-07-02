@@ -2,6 +2,8 @@ from agent.Memory import Memories
 import random
 
 class Batch:
+    __slots__ = ['batch_size', 'batch']
+
     def __init__(self, batch_size = 128):
         self.batch_size = batch_size
         self.batch: list[Memories] = []

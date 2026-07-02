@@ -5,6 +5,8 @@ import random
 import logging
 
 class Game:
+    __slots__ = ['dim', 'seed', 'logger', 'game_array', 'score', 'number_of_moves', 'game_over', 'logger_name']
+
     def __init__(self,dim=4, seed = None, logger_name="game"):
         if dim < 3:
             dim = 3
@@ -43,17 +45,19 @@ class Game:
     # happens after a move
     # or when initializing the game
     def populate(self):
-        random.seed(self.seed)
-        if random.random() < 0.5:
+        numpy.random.seed(self.seed)
+        if numpy.random.random() < 0.5:
             value = 4
         else:
             value = 2
-        row = random.randint(0, self.dim - 1)
-        col = random.randint(0, self.dim - 1)
 
-        while self.game_array[row][col] != 0:
-            row = random.randint(0, self.dim - 1)
-            col = random.randint(0, self.dim - 1)
+        #finding empty positions using numpy.where
+        empty_pos = numpy.where(self.game_array == 0)
+        idx = numpy.random.randint(0, len(empty_pos[0]))
+
+        row = empty_pos[0][idx]
+        col = empty_pos[1][idx]
+
         self.game_array[row][col] = value
 
     # does one step in the game
@@ -64,7 +68,7 @@ class Game:
         self.move(direction)
 
         if numpy.array_equal(state_before_move, self.game_array):
-            self.logger.debug("Game state did not change, doing nothing")
+            #self.logger.debug("Game state did not change, doing nothing")
             return False
 
         self.number_of_moves += 1
@@ -100,11 +104,11 @@ class Game:
         if 0 not in self.game_array:
             # check if any moves are possible (checks if any number has an equal next to it)
             # in rows
-            if (self.game_array[:,:-1] == self.game_array[:,1:]).any():
+            if numpy.any(self.game_array[:,:-1] == self.game_array[:,1:]):
                 self.game_over = False
                 return False
             # in columns
-            if (self.game_array[:-1,:] == self.game_array[1:,:]).any():
+            if numpy.any(self.game_array[:-1,:] == self.game_array[1:,:]):
                 self.game_over = False
                 return False
 
