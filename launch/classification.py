@@ -8,7 +8,8 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from agent.Agent import Agent
+from agent.Agent import Agent, best_move
+from game.Direction import Direction
 from models.modelV1 import Model
 
 
@@ -28,7 +29,7 @@ class Classification:
         # how many "best moves" will be used to train the model
         self.batch_size = 128
         # number of games agent is using to get the "best moves"
-        self.num_games = [50, 40, 30, 25]
+        self.num_games = [20]
         # number of moves looking back, used to calculate the value of the move
         self.max_deltas = 7
 
@@ -41,7 +42,7 @@ class Classification:
         self.momentum = 0.9
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
 
-        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas)
+        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas, sort_memories=True)
 
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.writer = SummaryWriter(f'runs/{self.timestamp}')
@@ -163,7 +164,7 @@ class Classification:
 
         self.save_model()
 
-    def write_to_tensorboard(self, loss=None, accuracy=None, avg=None, mean=None, avg_num_moves=None, epoch=int):
+    def write_to_tensorboard(self, loss=None, accuracy=None, avg=None, mean=None, avg_num_moves=None, epoch: int = -1):
         if loss is not None:
             self.writer.add_scalar('Loss/train', loss.item(), epoch)
 
@@ -235,3 +236,79 @@ class Classification:
 
         return avg_score[int(num_games_for_eval / 2)], sum(avg_score) / num_games_for_eval, sum(
             num_moves) / num_games_for_eval
+
+class Classification_Optimal(Classification):
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.model = Model().to(self.device)
+        self.loss_fn = nn.NLLLoss().to(self.device)
+
+        # number of generations model is trained on
+        self.epochs = 200
+        # how many "best moves" will be used to train the model
+        self.batch_size = 128
+        # number of games agent is using to get the "best moves"
+        self.num_games = [20]
+        # number of moves looking back, used to calculate the value of the move
+        self.max_deltas = 1
+
+        # parameter that decides how much the agent should explore(try random moves) or predict/decide on the move itself
+        # big epsilon means a lot more randomness, range is 0.00 - 1.00
+        self.epsilon = 0.95
+
+        self.learning_rate = 1e-3
+
+        self.momentum = 0.9
+        self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
+
+        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas, sort_memories=False)
+
+        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        #self.writer = SummaryWriter(f'runs/{self.timestamp}')
+
+    def collect_data(self, num_games: int = 20, epsilon: float = 0.10):
+        self.model.eval()
+
+        with torch.no_grad():
+            for i in range(num_games):
+                game = self.agent.game
+                stall_counter = 0
+                while not game.is_over():
+                    state = self.agent.get_state()
+                    if np.random.random() < epsilon:
+                        best_action = np.random.randint(0, 4)
+                    else:
+                        state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+
+                        log_probs = self.model(state_tensor)
+                        best_action = log_probs.argmax().item()
+
+                    valid = self.agent.play(best_action)
+
+                    # brute force a move if model always picks the same one
+                    if not valid:
+                        stall_counter += 1
+                        if stall_counter > 10:
+                            actions = [0, 1, 2, 3]
+                            np.random.shuffle(actions)
+                            for a in actions:
+                                if self.agent.play(a):
+                                    break
+                            stall_counter = 0
+                    else:
+                        stall_counter = 0
+                self.agent.new_game()
+
+                    # #get likely the best action and set it instead of action agent has played
+                    # if not game.game_over:
+                    #     action, reward = best_move(state)
+                    #     memory = self.agent.batch.batch[-1].memory_array[0]
+                    #     if memory is not None:
+                    #         memory.direction = Direction(action)
+                    #         memory.delta = reward
+
+    def main(self):
+        self.collect_data()
+        for memories in self.agent.batch.batch:
+            memories.print()

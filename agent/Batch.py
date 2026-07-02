@@ -1,30 +1,35 @@
-import random
+import numpy as np
 
 from agent.Memory import Memories
 
 
 class Batch:
-    __slots__ = ['batch_size', 'batch']
+    __slots__ = ['batch_size', 'batch','sort']
 
-    def __init__(self, batch_size=128):
+    def __init__(self, batch_size=128, sort: bool = True):
         self.batch_size = batch_size
         self.batch: list[Memories] = []
+        self.sort = sort
 
     def append(self, memory_list: Memories):
         self.batch.append(memory_list)
 
         # soft cap to amount of data stored, to prevent pc memory from exploding
         if len(self.batch) > self.batch_size * 50:
-            self.batch.sort(reverse=True)
+            if self.sort:
+                self.batch.sort(reverse=True)
             self.batch = self.batch[:self.batch_size * 5]
 
     def prepare_batch(self):
-        self.batch.sort(reverse=True)
+        if self.sort:
+            self.batch.sort(reverse=True)
+        else:
+            self.shuffle()
         if len(self.batch) > self.batch_size:
             self.batch = self.batch[:self.batch_size]
 
     def shuffle(self):
-        random.shuffle(self.batch)
+        np.random.shuffle(self.batch)
 
     def print(self, limit=16):
         print("Batch size: ", self.batch_size)

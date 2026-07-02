@@ -17,3 +17,7 @@ logs/agent.log
 #models
 runs/
 models/trained/
+
+#temp
+test.py
+best_move_distributions.csv

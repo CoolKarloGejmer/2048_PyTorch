@@ -1,4 +1,4 @@
-from launch.classification import Classification
+from launch.classification import Classification, Classification_Optimal
 from launch.command_line import CommandLine
 from launch.random import Random
 
@@ -13,8 +13,11 @@ def random():
     rand.main()
 
 
-def classification():
-    clas = Classification()
+def classification(optimal = True):
+    if optimal:
+        clas = Classification_Optimal()
+    else:
+        clas = Classification()
     clas.main()
 
 
