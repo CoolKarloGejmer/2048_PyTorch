@@ -46,6 +46,42 @@ class Classification:
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.writer = SummaryWriter(f'runs/{self.timestamp}')
 
+    # getting training data from games
+    def collect_data(self, num_games: int = 20, epsilon: float = 0.10):
+        self.model.eval()
+
+        with torch.no_grad():
+            for i in range(num_games):
+                game = self.agent.game
+                stall_counter = 0
+                while not game.is_over():
+                    if np.random.random() < epsilon:
+                        best_action = np.random.randint(0, 4)
+                    else:
+                        state = self.agent.get_state()
+
+                        state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+
+                        log_probs = self.model(state_tensor)
+                        best_action = log_probs.argmax().item()
+
+                    valid = self.agent.play(best_action)
+
+                    # brute force a move if model always picks the same one
+                    if not valid:
+                        stall_counter += 1
+                        if stall_counter > 10:
+                            actions = [0, 1, 2, 3]
+                            np.random.shuffle(actions)
+                            for a in actions:
+                                if self.agent.play(a):
+                                    break
+                            stall_counter = 0
+                    else:
+                        stall_counter = 0
+
+                self.agent.new_game()
+
     def main(self):
         num_games = self.num_games[0]
         count = 0
@@ -57,40 +93,7 @@ class Classification:
                 count += 1
                 num_games = self.num_games[count]
 
-            self.model.eval()
-
-            # getting training data from games
-            with torch.no_grad():
-                for i in range(num_games):
-                    game = self.agent.game
-                    stall_counter = 0
-                    while not game.is_over():
-                        if np.random.random() < epsilon:
-                            best_action = np.random.randint(0, 4)
-                        else:
-                            state = self.agent.get_state()
-
-                            state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-
-                            log_probs = self.model(state_tensor)
-                            best_action = log_probs.argmax().item()
-
-                        valid = self.agent.play(best_action)
-
-                        # brute force a move if model always picks the same one
-                        if not valid:
-                            stall_counter += 1
-                            if stall_counter > 10:
-                                actions = [0, 1, 2, 3]
-                                np.random.shuffle(actions)
-                                for a in actions:
-                                    if self.agent.play(a):
-                                        break
-                                stall_counter = 0
-                        else:
-                            stall_counter = 0
-
-                    self.agent.new_game()
+            self.collect_data(num_games, epsilon)
 
             # training
             self.model.train()
@@ -139,7 +142,7 @@ class Classification:
             avg_loss = total_loss / len(dataloader)
             accuracy = total_correct / total_samples
 
-            mean, avg, avg_num_moves = self.eval()
+            mean, avg, avg_num_moves = self.eval_performance()
 
             self.write_to_tensorboard(
                 loss=torch.tensor(avg_loss),
@@ -189,7 +192,9 @@ class Classification:
         torch.save(self.model.state_dict(), save_path)
 
     # function for getting avg and mean scores, average duration of game (in moves) from current model
-    def eval(self):
+    def eval_performance(self):
+        self.model.eval()
+
         num_games_for_eval = 20
 
         avg_score = []
@@ -208,16 +213,20 @@ class Classification:
                     log_probs = self.model(state_tensor)
                     best_action = log_probs.argmax().item()
 
-                    state0 = agent.get_state().copy()
-                    agent.play(best_action)
-                    if np.array_equal(state0, agent.get_state()):
+                    valid = agent.play(best_action)
+
+                    # brute force a move if model always picks the same one
+                    if not valid:
                         stall_counter += 1
-                        agent.play(np.random.randint(0, 4))
+                        if stall_counter > 10:
+                            actions = [0, 1, 2, 3]
+                            np.random.shuffle(actions)
+                            for a in actions:
+                                if agent.play(a):
+                                    break
+                            stall_counter = 0
                     else:
                         stall_counter = 0
-                    if stall_counter > 20:
-                        agent.logger.warning("Stalled, moving on to new game")
-                        break
 
                 avg_score.append(game.score)
                 num_moves.append(game.number_of_moves)
