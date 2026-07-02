@@ -1,14 +1,15 @@
 import numpy as np
+from torch.utils.tensorboard import SummaryWriter
 
 from agent.Agent import Agent
-from torch.utils.tensorboard import SummaryWriter
+
 
 class Random:
     def __init__(self):
         self.epochs = 100
         self.num_games = 50
 
-        self.scores=[]
+        self.scores = []
 
         self.agent = Agent(eval=True)
 
@@ -26,14 +27,14 @@ class Random:
                 self.scores.append(game.score)
                 self.agent.new_game()
                 game = self.agent.game
-            print(e,end=".  ")
+            print(e, end=".  ")
             self.write_to_tensorboard(
                 avg=sum(self.scores) / self.num_games,
-                mean=self.scores[int(self.num_games/2)],
+                mean=self.scores[int(self.num_games / 2)],
                 epoch=e
             )
 
-    def write_to_tensorboard(self, loss=None, accuracy=None, avg=None, mean=None,epoch=int):
+    def write_to_tensorboard(self, avg=None, mean=None, epoch=int):
         if mean is not None:
             self.writer.add_scalar('Mean_score/train', mean, epoch)
 

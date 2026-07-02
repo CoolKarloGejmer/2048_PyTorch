@@ -29,6 +29,7 @@ def row_solved(direction, row):
             return False
     return True
 
+
 # moves row in a direction
 def move_row(direction, row):
     if direction == Direction.LEFT or direction == Direction.UP:
@@ -43,6 +44,7 @@ def move_row(direction, row):
                 row[i] = row[i - 1]
                 row[i - 1] = 0
     return row
+
 
 # does addition to row in direction according to game rules
 def add_row(direction, row):

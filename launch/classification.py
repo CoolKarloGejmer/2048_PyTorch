@@ -2,16 +2,15 @@ import os
 from datetime import datetime
 
 import numpy as np
-
 import torch
 import torch.nn as nn
 from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
-
-from models.modelV1 import Model
+from torch.utils.tensorboard import SummaryWriter
 
 from agent.Agent import Agent
-from torch.utils.tensorboard import SummaryWriter
+from models.modelV1 import Model
+
 
 # this is kind of a "classification" approach to the problem
 # the model looks at the best moves it made in some number of games
@@ -29,7 +28,7 @@ class Classification:
         # how many "best moves" will be used to train the model
         self.batch_size = 128
         # number of games agent is using to get the "best moves"
-        self.num_games = [50,40,30,25]
+        self.num_games = [50, 40, 30, 25]
         # number of moves looking back, used to calculate the value of the move
         self.max_deltas = 7
 
@@ -47,21 +46,18 @@ class Classification:
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.writer = SummaryWriter(f'runs/{self.timestamp}')
 
-
     def main(self):
         num_games = self.num_games[0]
-        count=0
+        count = 0
         time_start = datetime.now()
         for e in range(self.epochs):
             self.agent.clear_batch()
             epsilon = self.epsilon * (0.95 ** e)
-            if e % int( self.epochs/ (len(self.num_games)+1) ) == 0 and e != 0:
-                count+=1
+            if e % int(self.epochs / (len(self.num_games) + 1)) == 0 and e != 0:
+                count += 1
                 num_games = self.num_games[count]
 
             self.model.eval()
-
-            game = self.agent.game
 
             # getting training data from games
             with torch.no_grad():
@@ -108,17 +104,14 @@ class Classification:
             deltas = torch.tensor(deltas, dtype=torch.float32, device=self.device)
             weights = torch.softmax(deltas, dim=0)
 
-            try:
-                dataset = TensorDataset(states, actions)
-                dataloader = DataLoader(
-                    dataset,
-                    batch_size=32,
-                    shuffle=True,
-                    num_workers=4,
-                    pin_memory=True if self.device.type == 'cuda' else False
-                )
-            except:
-                print(states,actions)
+            dataset = TensorDataset(states, actions)
+            dataloader = DataLoader(
+                dataset,
+                batch_size=32,
+                shuffle=True,
+                num_workers=4,
+                pin_memory=True if self.device.type == 'cuda' else False
+            )
 
             total_loss = 0
             total_correct = 0
@@ -132,8 +125,8 @@ class Classification:
                 self.optimizer.zero_grad()
                 output = self.model(batch_states)
                 loss = self.loss_fn(output, batch_actions)
-                #weighted loss
-                #loss = (self.loss_fn(output, batch_actions) * weights).mean()
+                # weighted loss
+                # loss = (self.loss_fn(output, batch_actions) * weights).mean()
                 loss.backward()
                 self.optimizer.step()
 
@@ -146,7 +139,7 @@ class Classification:
             avg_loss = total_loss / len(dataloader)
             accuracy = total_correct / total_samples
 
-            mean, avg, avg_num_moves = self.eval(epoch=e)
+            mean, avg, avg_num_moves = self.eval()
 
             self.write_to_tensorboard(
                 loss=torch.tensor(avg_loss),
@@ -157,9 +150,10 @@ class Classification:
                 epoch=e
             )
 
-            if e%5 == 0:
-                print(f"Epoch {e + 1}   |   Loss: {avg_loss:1.5f}   Accuracy: {accuracy:1.5f}   |   Mean score: {mean:4.0f}   Avg score: {avg:4.2f}   Avg moves: {avg_num_moves:3.2f}    |   total time: {(datetime.now()-time_start).total_seconds():.2f}s")
-                time_start=datetime.now()
+            if e % 5 == 0:
+                print(
+                    f"Epoch {e + 1}   |   Loss: {avg_loss:1.5f}   Accuracy: {accuracy:1.5f}   |   Mean score: {mean:4.0f}   Avg score: {avg:4.2f}   Avg moves: {avg_num_moves:3.2f}    |   total time: {(datetime.now() - time_start).total_seconds():.2f}s")
+                time_start = datetime.now()
                 self.save_model()
             else:
                 print('.', end=" ")
@@ -194,9 +188,8 @@ class Classification:
 
         torch.save(self.model.state_dict(), save_path)
 
-    # function for getting avg and mean scores from current model
-    def eval(self, epoch: int):
-        from game.Direction import Direction
+    # function for getting avg and mean scores, average duration of game (in moves) from current model
+    def eval(self):
         num_games_for_eval = 20
 
         avg_score = []
@@ -218,8 +211,8 @@ class Classification:
                     state0 = agent.get_state().copy()
                     agent.play(best_action)
                     if np.array_equal(state0, agent.get_state()):
-                        stall_counter+=1
-                        agent.play(np.random.randint(0,4))
+                        stall_counter += 1
+                        agent.play(np.random.randint(0, 4))
                     else:
                         stall_counter = 0
                     if stall_counter > 20:
@@ -231,4 +224,5 @@ class Classification:
                 agent.new_game()
                 game = agent.game
 
-        return avg_score[int(num_games_for_eval/2)], sum(avg_score) / num_games_for_eval, sum(num_moves) / num_games_for_eval
+        return avg_score[int(num_games_for_eval / 2)], sum(avg_score) / num_games_for_eval, sum(
+            num_moves) / num_games_for_eval

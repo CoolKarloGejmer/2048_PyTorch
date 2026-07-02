@@ -1,14 +1,16 @@
-from agent.Memory import Memories
 import random
+
+from agent.Memory import Memories
+
 
 class Batch:
     __slots__ = ['batch_size', 'batch']
 
-    def __init__(self, batch_size = 128):
+    def __init__(self, batch_size=128):
         self.batch_size = batch_size
         self.batch: list[Memories] = []
 
-    def append(self, memory_list = Memories):
+    def append(self, memory_list: Memories):
         self.batch.append(memory_list)
 
         # soft cap to amount of data stored, to prevent pc memory from exploding
@@ -24,7 +26,7 @@ class Batch:
     def shuffle(self):
         random.shuffle(self.batch)
 
-    def print(self, limit = 16):
+    def print(self, limit=16):
         print("Batch size: ", self.batch_size)
         if limit is None:
             for memories in self.batch:

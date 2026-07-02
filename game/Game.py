@@ -1,13 +1,14 @@
-from game.Helper import *
-from game.Direction import Direction
-import numpy
-import random
 import logging
+
+import numpy
+
+from game.Helper import *
+
 
 class Game:
     __slots__ = ['dim', 'seed', 'logger', 'game_array', 'score', 'number_of_moves', 'game_over', 'logger_name']
 
-    def __init__(self,dim=4, seed = None, logger_name="game"):
+    def __init__(self, dim=4, seed=None, logger_name="game"):
         if dim < 3:
             dim = 3
         self.dim = dim
@@ -20,7 +21,7 @@ class Game:
             datefmt='%d.%M.%Y. %H:%M:%S'
         )
 
-        self.game_array = numpy.zeros((dim,dim))
+        self.game_array = numpy.zeros((dim, dim))
         self.score = 0
         self.number_of_moves = 0
         self.game_over = False
@@ -37,7 +38,7 @@ class Game:
         print(self.game_array)
 
     def printsc(self):
-        for i in range(self.dim*2):
+        for i in range(self.dim * 2):
             print()
         self.print()
 
@@ -51,7 +52,7 @@ class Game:
         else:
             value = 2
 
-        #finding empty positions using numpy.where
+        # finding empty positions using numpy.where
         empty_pos = numpy.where(self.game_array == 0)
         idx = numpy.random.randint(0, len(empty_pos[0]))
 
@@ -68,7 +69,7 @@ class Game:
         self.move(direction)
 
         if numpy.array_equal(state_before_move, self.game_array):
-            #self.logger.debug("Game state did not change, doing nothing")
+            # self.logger.debug("Game state did not change, doing nothing")
             return False
 
         self.number_of_moves += 1
@@ -94,8 +95,8 @@ class Game:
             self.score += score
             while not row_solved(direction, row):
                 row = move_row(direction, row)
-                row,score = add_row(direction, row)
-                self.score+=score
+                row, score = add_row(direction, row)
+                self.score += score
 
         if direction == Direction.UP or direction == Direction.DOWN:
             self.game_array = self.game_array.transpose()
@@ -104,11 +105,11 @@ class Game:
         if 0 not in self.game_array:
             # check if any moves are possible (checks if any number has an equal next to it)
             # in rows
-            if numpy.any(self.game_array[:,:-1] == self.game_array[:,1:]):
+            if numpy.any(self.game_array[:, :-1] == self.game_array[:, 1:]):
                 self.game_over = False
                 return False
             # in columns
-            if numpy.any(self.game_array[:-1,:] == self.game_array[1:,:]):
+            if numpy.any(self.game_array[:-1, :] == self.game_array[1:, :]):
                 self.game_over = False
                 return False
 

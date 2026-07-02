@@ -1,10 +1,10 @@
-from game.Direction import Direction
 from game.Helper import *
+
 
 class Memory:
     __slots__ = ['state0', 'direction', 'delta']
 
-    def __init__(self, state0 = None, direction = Direction, delta = 0):
+    def __init__(self, state0=None, direction=Direction, delta=0):
         self.state0 = state0
         self.direction = direction
         self.delta = delta
@@ -37,12 +37,12 @@ class Memory:
                 if i == 0:
                     print(self.state0[i], end="         ")
                     print(f"Move Direction: {self.direction.name}, delta: {self.delta}")
-                elif i == len(self.state0)-1:
-                    print(" ",self.state0[i], end=" ]\n")
+                elif i == len(self.state0) - 1:
+                    print(" ", self.state0[i], end=" ]\n")
                 else:
-                    print(" ",self.state0[i])
+                    print(" ", self.state0[i])
         else:
-            print(f"[[]] Move Direction: {self.direction}, delta: {self.delta}")
+            print(f"[[]] Move Direction: {self.direction.name}, delta: {self.delta}")
 
     def copy(self):
         if self.state0 is not None:
@@ -51,10 +51,11 @@ class Memory:
             state_copy = None
         return Memory(state_copy, self.direction, self.delta)
 
+
 class Memories:
     __slots__ = ['memory_array', 'max_memories', 'delta_sum']
 
-    def __init__(self, max_memories = 5):
+    def __init__(self, max_memories=5):
         self.memory_array: list[Memory] = []
         self.max_memories = max_memories
         self.delta_sum = 0
@@ -78,13 +79,13 @@ class Memories:
 
     def put(self, state0=None, direction=Direction, delta=0, memory=None):
         if memory is not None:
-            self.memory_array.insert(0,memory)
+            self.memory_array.insert(0, memory)
         else:
             memory_obj = Memory(state0, direction, delta)
-            self.memory_array.insert(0,memory_obj)
+            self.memory_array.insert(0, memory_obj)
 
         if len(self.memory_array) > self.max_memories:
-            removed = self.memory_array.pop(-1)
+            self.memory_array.pop(-1)
 
         self.calc_delta_sum()
 
@@ -96,7 +97,7 @@ class Memories:
             print()
 
     def copy(self):
-        memories_copy = Memories(max_memories = self.max_memories)
+        memories_copy = Memories(max_memories=self.max_memories)
         memories_copy.delta_sum = self.delta_sum
 
         memories_copy.memory_array = [mem.copy() for mem in self.memory_array]
@@ -108,6 +109,6 @@ class Memories:
         self.delta_sum = 0
 
     def calc_delta_sum(self):
-        self.delta_sum=0
+        self.delta_sum = 0
         for i in range(len(self.memory_array)):
-            self.delta_sum += self.memory_array[i].delta * (0.9**i)
+            self.delta_sum += self.memory_array[i].delta * (0.9 ** i)
