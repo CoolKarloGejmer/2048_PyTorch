@@ -11,9 +11,15 @@ class Batch:
     def append(self, memory_list = Memories):
         self.batch.append(memory_list)
 
+        # soft cap to amount of data stored, to prevent pc memory from exploding
+        if len(self.batch) > self.batch_size * 50:
+            self.batch.sort(reverse=True)
+            self.batch = self.batch[:self.batch_size * 5]
+
+    def prepare_batch(self):
+        self.batch.sort(reverse=True)
         if len(self.batch) > self.batch_size:
-            self.batch.sort()
-            self.batch.pop(0)
+            self.batch = self.batch[:self.batch_size]
 
     def shuffle(self):
         random.shuffle(self.batch)

@@ -75,7 +75,7 @@ class Game:
         self.populate()
         self.is_over()
 
-        return None
+        return True
 
     # 1. performs one move (moving + adding)
     # 2. checks if solved,

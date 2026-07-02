@@ -32,14 +32,21 @@ class Agent:
 
     def play(self, action=int):
         direction = Direction(action)
-
-        delta = self.game.score
+        score_before = self.game.score
         state0 = self.game.game_array.copy()
 
-        if not self.game.step(direction) and self.evaluation_mode == False:
-            delta = abs(delta-self.game.score)
+        is_valid = self.game.step(direction)
+
+        if self.evaluation_mode:
+            return is_valid is None
+
+        if is_valid is True:
+            delta = self.game.score - score_before
             self.memories.put(state0, direction, delta)
-            self.batch.append(memory_list = self.memories.copy())
+            self.batch.append(memory_list=self.memories.copy())
+            return True
+        else:
+            return False
 
     def new_game(self, game = None):
         self.logger.debug("Initializing new game")

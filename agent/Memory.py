@@ -55,7 +55,7 @@ class Memories:
     __slots__ = ['memory_array', 'max_memories', 'delta_sum']
 
     def __init__(self, max_memories = 5):
-        self.memory_array = []
+        self.memory_array: list[Memory] = []
         self.max_memories = max_memories
         self.delta_sum = 0
 
@@ -78,16 +78,15 @@ class Memories:
 
     def put(self, state0=None, direction=Direction, delta=0, memory=None):
         if memory is not None:
-            self.memory_array.append(memory)
-            self.delta_sum += memory.delta
+            self.memory_array.insert(0,memory)
         else:
             memory_obj = Memory(state0, direction, delta)
-            self.memory_array.append(memory_obj)
-            self.delta_sum += memory_obj.delta
+            self.memory_array.insert(0,memory_obj)
 
         if len(self.memory_array) > self.max_memories:
-            removed = self.memory_array.pop(0)
-            self.delta_sum -= removed.delta
+            removed = self.memory_array.pop(-1)
+
+        self.calc_delta_sum()
 
     def print(self):
         print("Maximum number of memories: ", self.max_memories)
@@ -107,3 +106,8 @@ class Memories:
     def clear(self):
         self.memory_array = []
         self.delta_sum = 0
+
+    def calc_delta_sum(self):
+        self.delta_sum=0
+        for i in range(len(self.memory_array)):
+            self.delta_sum += self.memory_array[i].delta * (0.9**i)
