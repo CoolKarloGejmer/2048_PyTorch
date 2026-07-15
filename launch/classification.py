@@ -250,8 +250,6 @@ class Classification_Optimal(Classification):
         self.batch_size = 128
         # number of games agent is using to get the "best moves"
         self.num_games = [20]
-        # number of moves looking back, used to calculate the value of the move
-        self.max_deltas = 1
 
         # parameter that decides how much the agent should explore(try random moves) or predict/decide on the move itself
         # big epsilon means a lot more randomness, range is 0.00 - 1.00
@@ -262,7 +260,7 @@ class Classification_Optimal(Classification):
         self.momentum = 0.9
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
 
-        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas, sort_memories=False)
+        self.agent = Agent(batch_size=self.batch_size, max_deltas=1, sort_memories=False)
 
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         #self.writer = SummaryWriter(f'runs/{self.timestamp}')
@@ -300,15 +298,28 @@ class Classification_Optimal(Classification):
                         stall_counter = 0
                 self.agent.new_game()
 
-                    # #get likely the best action and set it instead of action agent has played
-                    # if not game.game_over:
-                    #     action, reward = best_move(state)
-                    #     memory = self.agent.batch.batch[-1].memory_array[0]
-                    #     if memory is not None:
-                    #         memory.direction = Direction(action)
-                    #         memory.delta = reward
+
+
+    def prepare_data(self):
+        batch = self.agent.batch.batch
+        for memories in batch:
+            memory = memories.memory_array[0]
+            if memory is not None:
+                state = memory.state0
+                #get likely the best action and set it instead of action agent has played
+                action, reward = best_move(state)
+
+                memory.direction = Direction(action)
+                memory.delta = reward
+        return
 
     def main(self):
+        batch = self.agent.batch.batch
+        print("collect")
         self.collect_data()
-        for memories in self.agent.batch.batch:
-            memories.print()
+        for i in range(5):
+            batch[i].memory_array[0].print()
+        print("prepare")
+        self.prepare_data()
+        for i in range(5):
+            batch[i].memory_array[0].print()

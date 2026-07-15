@@ -4,10 +4,10 @@ from game.Helper import *
 class Memory:
     __slots__ = ['state0', 'direction', 'delta']
 
-    def __init__(self, state0=None, direction=Direction, delta=0):
-        self.state0 = state0
-        self.direction = direction
-        self.delta = delta
+    def __init__(self, state0=None, direction = Direction, delta=0):
+        self.state0: list[list[int]] = state0
+        self.direction: Direction = direction
+        self.delta: int = delta
 
     def __add__(self, other):
         if isinstance(other, Memory):
