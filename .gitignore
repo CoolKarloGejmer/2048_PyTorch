@@ -4,6 +4,9 @@ PLAN.txt
 #IDE specific
 .idea
 
+#data
+data/data.csv
+
 #python specific
 game/__pycache__
 agent/__pycache__

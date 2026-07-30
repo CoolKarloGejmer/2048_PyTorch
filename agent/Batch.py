@@ -4,7 +4,7 @@ from agent.Memory import Memories
 
 
 class Batch:
-    __slots__ = ['batch_size', 'batch','sort']
+    __slots__ = ['batch_size', 'batch', 'sort']
 
     def __init__(self, batch_size=128, sort: bool = True):
         self.batch_size = batch_size

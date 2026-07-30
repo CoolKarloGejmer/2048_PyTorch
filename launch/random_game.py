@@ -11,7 +11,7 @@ class Random:
 
         self.scores = []
 
-        self.agent = Agent(eval=True)
+        self.agent = Agent(evaluation_mode=True)
 
         self.writer = SummaryWriter(f'runs/Random_Moves')
 

@@ -24,7 +24,7 @@ class CommandLine:
         return move
 
     def main(self):
-        game = Game()
+        game = Game(dim=4)
         if self.state is not None:
             game.game_array = self.state
         game.print()

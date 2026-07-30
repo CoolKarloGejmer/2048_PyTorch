@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 import torch
 
@@ -8,65 +6,23 @@ from agent.Memory import Memories
 from game.Direction import Direction
 from game.Game import Game
 
-def best_move(state, depth: int = 8):
-    actions = [0,1,2,3]
-
-    best_action = None
-    best_score = -1
-
-    agent = Agent(eval=True)
-    for action in actions:
-        agent.game.score = 0
-        agent.game.__setstate__(state.copy())
-
-        valid = agent.play(action)
-        if not valid:
-            continue
-
-        total_reward = agent.game.score
-
-        for i in range(depth-2):
-            valid = agent.play(np.random.randint(0,4))
-            stall_counter = 0
-            while not valid:
-                stall_counter += 1
-                valid = agent.play(np.random.randint(0,4))
-                if stall_counter > 20:
-                    break
-
-            total_reward += agent.game.score * 0.9**(i+2)
-
-        if total_reward > best_score:
-            best_action = action
-            best_score = total_reward
-
-    if best_action is None:
-        print('WARNING - game should be over but is not')
-    return best_action, best_score
 
 class Agent:
-    def __init__(self, game=None, dim=4, seed=None, logger_name="agent", batch_size=128, max_deltas=7, eval=False, sort_memories: bool = True):
-        self.evaluation_mode = eval
+    def __init__(self, game=None, dim=4, seed=None, batch_size=128, max_deltas=7,
+                 evaluation_mode=True, sort_memories: bool = True):
+        self.evaluation_mode = evaluation_mode
+
+        self.dim = dim
+        self.rand = np.random.default_rng(seed)
 
         if not self.evaluation_mode:
             self.memories = Memories(max_memories=max_deltas)
             self.batch = Batch(batch_size=batch_size, sort=sort_memories)
 
-        self.dim = dim
-        self.seed = seed
-        self.logger_name = logger_name
         if game is None:
-            self.game = Game(dim=self.dim, seed=self.seed, logger_name=self.logger_name)
+            self.game = Game(dim=self.dim, rand=self.rand)
         else:
             self.game = game
-
-        self.logger = logging.getLogger("Agent")
-        logging.basicConfig(
-            filename=f"./logs/{self.logger_name}.log",
-            level=logging.DEBUG,
-            format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
-            datefmt='%d.%M.%Y. %H:%M:%S'
-        )
 
     def play(self, action: int):
         direction = Direction(action)
@@ -87,18 +43,74 @@ class Agent:
             return False
 
     def new_game(self, game=None):
-        self.logger.debug("Initializing new game")
-
         if not self.evaluation_mode:
             self.memories.clear()
 
         if game is None:
-            self.game = Game(dim=self.dim, seed=None, logger_name=self.logger_name)
+            self.game.reset()
         else:
             self.game = game
 
     def clear_batch(self):
         self.batch.clear()
+
+    def best_move(self, state, depth: int = 9, repeats: int = 128):
+        distribution = {0: 0, 1: 0, 2: 0, 3: 0}
+        for _ in range(repeats):
+            actions = [0, 1, 2, 3]
+
+            best_action = None
+            best_score = -1
+
+            agent = self
+            for candidate_action in actions:
+                agent.game.score = 0
+                agent.game.__setstate__(state.copy())
+
+                valid = agent.play(candidate_action)
+                if not valid:
+                    continue
+
+                total_reward = agent.game.score
+
+                moves = agent.rand.integers(low=0, high=4, size=depth)
+                for step in range(depth - 1):
+                    action = moves[step]
+
+                    valid = agent.play(action)
+
+                    if not valid:
+                        remaining_actions = [a for a in actions if a != action]
+                        agent.rand.shuffle(remaining_actions)
+                        for fallback in remaining_actions:
+                            valid = agent.play(fallback)
+                            if valid:
+                                break
+
+                    if not valid:
+                        break
+
+                    total_reward += agent.game.score * 0.9 ** (step + 2)
+
+                if total_reward > best_score:
+                    best_action = candidate_action
+                    best_score = total_reward
+
+            if best_action is not None:
+                distribution[best_action] += 1
+
+        total = sum(distribution.values())
+
+        if total == 0:
+            print('WARNING - game should be over but is not')
+            return np.random.randint(0, 4), 0.0
+
+        distribution = {k: v / total for k, v in distribution.items()}
+
+        best_action = max(distribution, key=distribution.get)
+        reward = distribution[best_action]
+
+        return best_action, round(reward, 5)
 
     # converts data from batch to list of state / actions
     # then converts them to torch.tensor-s for training the model
@@ -112,7 +124,7 @@ class Agent:
 
                 states.append(mem.state0)
                 actions.append(mem.direction.value)
-                deltas.append(mem.delta)
+                deltas.append(mem.reward)
 
         if not states:
             return torch.tensor([]), torch.tensor([], dtype=torch.long), []
