@@ -1,10 +1,10 @@
 import numpy as np
 import torch
 
-from agent.Batch import Batch
-from agent.Memory import Memories
+from agent.Memory import Memories, Batch
 from game.Direction import Direction
 from game.Game import Game
+from game.Helper import get_valid_action_mask
 
 
 class Agent:
@@ -51,10 +51,12 @@ class Agent:
         else:
             self.game = game
 
+        return self.game
+
     def clear_batch(self):
         self.batch.clear()
 
-    def best_move(self, state, depth: int = 9, repeats: int = 128):
+    def moves_rewards(self, state, depth: int = 9, repeats: int = 128):
         distribution = {0: 0, 1: 0, 2: 0, 3: 0}
         for _ in range(repeats):
             actions = [0, 1, 2, 3]
@@ -62,35 +64,39 @@ class Agent:
             best_action = None
             best_score = -1
 
-            agent = self
+            rand = self.rand
             for candidate_action in actions:
-                agent.game.score = 0
-                agent.game.__setstate__(state.copy())
+                sim_game = Game(dim=self.dim, rand=self.rand)
+                sim_game.__setstate__(state.copy())
+                sim_game.score = 0
+                sim_game.number_of_moves = 0
+                sim_game.has_empty_spots = bool((sim_game.game_array == 0).any())
+                sim_game.game_over = False
 
-                valid = agent.play(candidate_action)
+                valid = sim_game.step(Direction(candidate_action))
                 if not valid:
                     continue
 
-                total_reward = agent.game.score
+                total_reward = sim_game.score
 
-                moves = agent.rand.integers(low=0, high=4, size=depth)
+                moves = rand.integers(low=0, high=4, size=depth)
                 for step in range(depth - 1):
                     action = moves[step]
 
-                    valid = agent.play(action)
+                    valid = sim_game.step(Direction(action))
 
                     if not valid:
                         remaining_actions = [a for a in actions if a != action]
-                        agent.rand.shuffle(remaining_actions)
+                        rand.shuffle(remaining_actions)
                         for fallback in remaining_actions:
-                            valid = agent.play(fallback)
+                            valid = sim_game.step(Direction(fallback))
                             if valid:
                                 break
 
                     if not valid:
                         break
 
-                    total_reward += agent.game.score * 0.9 ** (step + 2)
+                    total_reward += sim_game.score * 0.9 ** (step + 2)
 
                 if total_reward > best_score:
                     best_action = candidate_action
@@ -106,6 +112,11 @@ class Agent:
             return np.random.randint(0, 4), 0.0
 
         distribution = {k: v / total for k, v in distribution.items()}
+
+        return distribution
+
+    def best_move(self, state, depth: int = 9, repeats: int = 128):
+        distribution = self.moves_rewards(state, depth, repeats)
 
         best_action = max(distribution, key=distribution.get)
         reward = distribution[best_action]

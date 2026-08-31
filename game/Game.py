@@ -29,7 +29,7 @@ class Game:
         self.game_array = np.asanyarray(state)
 
     def print(self):
-        print(f"Score: {self.score}\nNumber of moves:{self.number_of_moves}")
+        print(f"Score: {int(self.score)}\nNumber of moves: {self.number_of_moves}")
         print(self.game_array)
 
     def printsc(self):
@@ -52,8 +52,7 @@ class Game:
 
         self.game_array[row][col] = 4 if rand.random() < 0.5 else 2
 
-        if n_empty == 1:
-            self.has_empty_spots = False
+        self.has_empty_spots = n_empty > 1
 
     # does one step in the game
     # 1. performs a move
@@ -78,7 +77,6 @@ class Game:
     # one row/column is copied to be solved at a time
     def move(self, direction: Direction):
         game_array = self.game_array
-        empty=self.has_empty_spots
         dim = self.dim
 
         if direction == Direction.UP or direction == Direction.DOWN:
@@ -88,11 +86,9 @@ class Game:
         temp_score = 0
         for row_indx in range(dim):
             original_row = game_array[row_indx].tolist()
-            row, zeros, score = solve_row(direction, original_row)
+            row, zeros, score = solve_row(direction, original_row.copy())
             if not changed and row != original_row:
                 changed = True
-            if not empty and 0 in row:
-                empty = True
             game_array[row_indx] = row
             temp_score += score
 
@@ -101,28 +97,26 @@ class Game:
         return changed
 
     def is_over(self):
-        game_array = self.game_array.tolist()
         if self.has_empty_spots:
             self.game_over = False
             return False
 
+        game_array = self.game_array
+
         # check if any moves are possible (checks if any number has an equal next to it)
         # in rows
-        for row in game_array:
-            if not unique_neighbours(row):
-                self.game_over = False
-                return False
-
+        if (game_array[:, :-1] == game_array[:, 1:]).any():
+            self.game_over = False
+            return False
         # in columns
-        for col in range(self.dim):
-            if not unique_neighbours(game_array[col][:]):
-                self.game_over = False
-                return False
+        if (game_array[:-1, :] == game_array[1:, :]).any():
+            self.game_over = False
+            return False
 
         self.game_over = True
         return True
 
-    def get_state(self):
+    def get_state(self) -> np.ndarray | list[list[int]]:
         return self.game_array
 
     def reset(self):

@@ -1,6 +1,6 @@
 import math
 import os
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict
 
 import numpy as np
 import pandas as pd
@@ -263,7 +263,7 @@ class DataWriter(DataManipulator):
         self.pending_writes = []
         self.batch_size = 128
 
-    def add_entry(self, hashed_state: str, best_action: int, reward: float, dim: int = 4):
+    def add_entry(self, hashed_state: str, best_action: int | Dict[int, float], reward: float, dim: int = 4):
         if self.exists(hashed_state):
             return True
         else:
@@ -278,7 +278,7 @@ class DataWriter(DataManipulator):
 
         return False
 
-    def save_state(self, hashed_state: str, best_action: int, reward: float, dim: int = 4):
+    def save_state(self, hashed_state: str, best_action: int | Dict[int, float], reward: float, dim: int = 4):
         already_exists = self.add_entry(hashed_state, best_action, reward, dim)
 
         if not already_exists:
@@ -297,7 +297,7 @@ class DataWriter(DataManipulator):
         else:
             return True
 
-    def save(self, state0: list[list[int]] | np.array | str, best_action: int | None, reward: float| None, dim: int = 4):
+    def save(self, state0: list[list[int]] | np.array | str, best_action: int | Dict[int, float] | None, reward: float| None, dim: int = 4):
         if isinstance(state0, str):
             hashed_state = state0
         else:
@@ -386,6 +386,11 @@ class DataReader(DataManipulator):
 
         states, actions, rewards, dims = self.convert_types(data)
 
+        return states,actions,rewards
+
+    def get_tensor_dataset(self, n: int = 512, shuffle: bool = True, filter: str | Direction | float | int | list | None = None):
+        states, actions, rewards = self.get_dataset(n, shuffle, filter)
+
         states, actions, rewards = self.to_tensor(states, actions, rewards)
 
-        return states,actions,rewards
+        return states, actions, rewards

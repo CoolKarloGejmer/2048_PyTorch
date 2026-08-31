@@ -10,6 +10,7 @@ def transpose(array: list[list[int]] | list[list[bool]]):
     for i in range(dim):
         for j in range(i+1, dim):
             array[i][j], array[j][i] = array[j][i], array[i][j]
+    return array
 
 # checks if each neighbour is unique
 def unique_neighbours(row: list[int]):
@@ -78,6 +79,33 @@ def solve_row(direction: Direction, row: list[int]):
 
     return row, zeros, score
 
+def check_if_valid(direction: Direction | int, state) -> bool:
+    old_state = state.copy()
+
+    dim = len(state)
+    if isinstance(direction, int):
+        direction = Direction(direction)
+    changed = False
+
+    if direction == Direction.UP or direction == Direction.DOWN:
+        state = transpose(state)
+        old_state = transpose(old_state)
+
+    for row_indx in range(dim):
+        row = [value for value in state[row_indx]]
+        row, zeros, score = solve_row(direction, row)
+        if (row != old_state[row_indx]).any():
+            changed = True
+            break
+
+    return changed
+
+def get_valid_action_mask(state):
+    mask = [True, True, True, True]
+    for action in range(4):
+        mask[action] = check_if_valid(action, state.copy())
+    return mask
+
 def example_new(direction, state):
     state = np.asarray(state)
     dim = len(state)
@@ -87,7 +115,7 @@ def example_new(direction, state):
 
     for row_indx in range(dim):
         row = state[row_indx].tolist()
-        row, score = solve_row(direction, row)
+        row, score = solve_row(direction, row.copy())
         state[row_indx] = row
 
     if direction == Direction.UP or direction == Direction.DOWN:

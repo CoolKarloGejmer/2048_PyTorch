@@ -346,7 +346,7 @@ class ClassificationDataCollector(Classification):
             # train
             self.model.train()
 
-            states, actions, rewards = self.data_reader.get_dataset(self.batch_size)
+            states, actions, rewards = self.data_reader.get_tensor_dataset(self.batch_size)
             states = states.to(self.device)
             actions = actions.to(self.device)
             weights = torch.softmax(rewards, dim=0)
