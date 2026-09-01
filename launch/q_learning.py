@@ -91,15 +91,24 @@ class SimpleQLearning:
 
         torch.save(self.model.state_dict(), save_path)
 
-    def write_to_tensorboard(self, loss=None, score=None, num_moves=None, epoch: int = -1):
-        if loss is not None:
-            self.writer.add_scalar('Loss/train', loss / num_moves, epoch)
+    def write_to_tensorboard(self, loss=None, score=None, num_moves=None, epoch: int = -1, tag = "train"):
+        if loss is not None and float(loss) != 0.0:
+            self.writer.add_scalar(f"Loss/{tag}", loss, epoch)
 
-        if score is not None:
-            self.writer.add_scalar('Score/train', score, epoch)
+        if score is not None and float(score) != 0.0:
+            self.writer.add_scalar(f'Score/{tag}', score, epoch)
 
-        if num_moves is not None:
-            self.writer.add_scalar('Num_moves/train', num_moves, epoch)
+        if num_moves is not None and float(num_moves) != 0.0:
+            self.writer.add_scalar(f'Num_moves/{tag}', num_moves, epoch)
+
+    def avg_and_to_tensorboard(self, losses, scores, moves, epoch, tag = "train"):
+        avg_loss = sum(losses) / len(losses) if losses else 0.0
+        avg_score = sum(scores) / len(scores) if scores else 0.0
+        avg_moves = sum(moves) / len(moves) if moves else 0.0
+
+        self.write_to_tensorboard(avg_loss, avg_score, avg_moves, epoch=epoch, tag=tag)
+
+        return avg_loss, avg_score, avg_moves
 
     def prepare_data(self):
         data_saver = self.data_writer
@@ -197,7 +206,7 @@ class SimpleQLearning:
             total_loss, score, num_of_moves = self.play_game(epsilon)
             yield total_loss, score, num_of_moves
 
-    def loop(self):
+    def main(self):
         time_start = datetime.now()
         epsilon = self.epsilon
 
@@ -232,9 +241,6 @@ class SimpleQLearning:
             if e % 100 == 0:
                 self.save_model()
 
-    def main(self):
-        self.loop()
-
 class ExperienceReplay(SimpleQLearning):
     def __init__(self, continue_training = False):
         super().__init__()
@@ -258,9 +264,10 @@ class ExperienceReplay(SimpleQLearning):
         self.epochs = 1000
         self.start_epoch = 0
         self.num_games = 50
+        self.num_eval_games = 10
 
         self.bellman_discount = 0.95
-        self.epsilon = 0.35
+        self.epsilon = 0.95
 
     def continue_training(self):
         self.filename = "NotMade"
@@ -269,15 +276,6 @@ class ExperienceReplay(SimpleQLearning):
         path = os.path.join(dir, modelname)
         self.model.load_state_dict(torch.load(path, weights_only=True))
         self.model.eval()
-
-    def avg_and_to_tensorboard(self, losses, scores, moves, e):
-        avg_loss = sum(losses) / len(losses) if losses else 0.0
-        avg_score = sum(scores) / len(scores) if scores else 0.0
-        avg_moves = sum(moves) / len(moves) if moves else 0.0
-
-        self.write_to_tensorboard(avg_loss, avg_score, avg_moves, epoch=e)
-
-        return avg_loss, avg_score, avg_moves
 
     # rewards are adjusted in game_step with log2
     def targets_reward_function(self, rewards, q_values, dones, discount):
@@ -321,11 +319,31 @@ class ExperienceReplay(SimpleQLearning):
 
         return done, game.score, game.number_of_moves
 
+    def evaluate(self, e):
+        agent = self.agent
+        game = self.agent.game
+
+        scores, moves = [], []
+        for _ in range(self.num_games):
+            agent.new_game()
+            done = False
+            while not done:
+                done, score, num_moves = self.game_step(0)
+            scores.append(game.score)
+            moves.append(game.number_of_moves)
+
+        self.avg_and_to_tensorboard(None, scores, moves, epoch=e, tag = "t_eval")
+
     def train_step(self):
         if len(self.replay) < self.min_replay_size:
             return None
 
         states, actions, rewards, next_states, dones = self.replay.sample(self.batch_size)
+
+        masks = torch.tensor(
+            [get_valid_action_mask(s) if not done else [True, True, True, True] for s, done in zip(next_states, dones)],
+            dtype=torch.bool, device=self.device
+        )
 
         states = torch.tensor(states, device=self.device)
         actions = torch.tensor(actions, device=self.device)
@@ -336,7 +354,10 @@ class ExperienceReplay(SimpleQLearning):
         q_values = self.model(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
-            next_q_values = self.target_model(next_states).max(dim=1).values
+            q_next = self.target_model(next_states)
+            q_next = q_next.masked_fill(~masks, float('-inf'))
+            next_q_values = q_next.max(dim=1).values
+            next_q_values = torch.where(dones.bool(), torch.zeros_like(next_q_values), next_q_values)
             targets = self.targets_reward_function(rewards, next_q_values, dones, self.bellman_discount)
 
         loss = self.loss_fn(q_values, targets)
@@ -353,7 +374,7 @@ class ExperienceReplay(SimpleQLearning):
         return loss.item()
 
     def main(self):
-        print("Started")
+        print("Started, running on device: ", self.device)
         time_start = datetime.now()
         epsilon = self.epsilon
         agent = self.agent
@@ -382,6 +403,10 @@ class ExperienceReplay(SimpleQLearning):
                 scores.append(game.score)
                 moves.append(game.number_of_moves)
 
-            average_loss, average_score, average_moves= self.avg_and_to_tensorboard(losses, scores, moves, e)
+            average_loss, average_score, average_moves = self.avg_and_to_tensorboard(losses, scores, moves, e)
             print(f"Epoch {e + 1:4.0f}.       Loss: {average_loss:5.10f}   -   Score: {average_score:5.0f}   -   Moves: {average_moves:4.0f}      -> Total Time: {(datetime.now() - time_start).total_seconds():.2f}s            Epsilon: {epsilon:2.5f}")
             time_start = datetime.now()
+            self.evaluate(e)
+
+            if e % 20 == 0:
+                self.save_model()

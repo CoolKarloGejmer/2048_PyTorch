@@ -42,5 +42,6 @@ def q_learning():
     q.main()
 
 if __name__ == "__main__":
-    data()
+    q_learning()
+    #data()
     #command_line()
