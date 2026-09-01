@@ -261,7 +261,7 @@ class ExperienceReplay(SimpleQLearning):
         self.target_sync_every = 1000
 
         self.batch_size = 512
-        self.epochs = 1000
+        self.epochs = 5000
         self.start_epoch = 0
         self.num_games = 50
         self.num_eval_games = 10
@@ -294,7 +294,7 @@ class ExperienceReplay(SimpleQLearning):
 
         with torch.no_grad():
             q_values = model(state_tensor)[0]
-            mask = torch.tensor(valid_action_mask, dtype=torch.bool)
+            mask = torch.tensor(valid_action_mask, dtype=torch.bool, device=self.device)
             masked_q = q_values.detach().masked_fill(~mask, float('-inf'))
             return masked_q.argmax().item()
 
