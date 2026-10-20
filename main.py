@@ -38,7 +38,7 @@ def data():
     data_driven.play_game()
 
 def q_learning():
-    q = ExperienceReplay()
+    q = ExperienceReplay(continue_training=True)
     q.main()
 
 if __name__ == "__main__":

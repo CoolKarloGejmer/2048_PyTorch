@@ -171,17 +171,24 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-    def push(self, state, action, reward, next_state, done):
-        self.buffer.append( (state,action,reward,next_state,done) )
+    def push(self, state, action, reward, next_state, next_state_mask=None, done=0.0):
+        if next_state_mask is None:
+            next_state_mask = [True, True, True, True]
+        self.buffer.append((state, action, reward, next_state, next_state_mask, done))
+
+    def add_mask_to_previous(self, mask):
+        state, action, reward, next_state, next_state_mask, done = self.buffer[-1]
+        self.buffer[-1] = (state, action, reward, next_state, mask, done)
 
     def sample(self, batch_size):
         indices = self.rand.choice(len(self.buffer), batch_size, replace=False)
         batch = [self.buffer[i] for i in indices]
-        states, actions, rewards, next_states, dones = zip(*batch)
+        states, actions, rewards, next_states, masks, dones = zip(*batch)
         return (
             np.array(states, dtype=np.float32),
             np.array(actions, dtype=np.int64),
             np.array(rewards, dtype=np.float32),
             np.array(next_states, dtype=np.float32),
+            np.array(masks,dtype=np.bool),
             np.array(dones, dtype=np.float32),
         )

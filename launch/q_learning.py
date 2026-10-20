@@ -35,6 +35,7 @@ def scale_state(state: list[list[int]], dim=4):
 class SimpleQLearning:
     def __init__(self, continue_training = False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')
 
         self.model = ModelSmall().to(self.device)
         self.target_model = ModelSmall().to(self.device)
@@ -49,13 +50,16 @@ class SimpleQLearning:
 
         self.epsilon = 0.95
 
-        self.learning_rate = 1e-3
+        self.learning_rate = 2e-3
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        self.filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.filename = self.timestamp
+        self.modelname = f"{self.model.__class__.__name__}_{self.filename}.pt"
         if continue_training:
             self.continue_training()
-        self.writer = SummaryWriter(RUNS_DIR / self.filename)
+        else:
+            self.writer = SummaryWriter(RUNS_DIR / self.filename)
 
         self.data_writer = DataWriter()
         self.states_set = set()
@@ -73,21 +77,19 @@ class SimpleQLearning:
 
     def continue_training(self):
         self.filename = "trained_2026-08-30_11-20-09"
+        self.modelname = "Model_Small_2026-08-30_11-20-09.pt"
+
+        self.writer = SummaryWriter(RUNS_DIR / self.filename)
         dir = MODELS_DIR
-        modelname = "Model_Small_2026-08-30_11-20-09.pt"
-        path = os.path.join(dir, modelname)
+        path = os.path.join(dir, self.modelname)
         self.model.load_state_dict(torch.load(path, weights_only=True))
         self.model.eval()
 
     def save_model(self):
-        model_class_name = self.model.__class__.__name__
-
         save_dir = MODELS_DIR
         os.makedirs(save_dir, exist_ok=True)
 
-        filename = f"{model_class_name}_{self.filename}.pt"
-
-        save_path = os.path.join(save_dir, filename)
+        save_path = os.path.join(save_dir, self.modelname)
 
         torch.save(self.model.state_dict(), save_path)
 
@@ -162,7 +164,7 @@ class SimpleQLearning:
             if rand.random() < epsilon:
                 action = rand.choice([i for i in range(4) if valid_action_mask[i]])
             else:
-                mask = torch.tensor(valid_action_mask, dtype=torch.bool)
+                mask = torch.tensor(valid_action_mask, dtype=torch.bool, device=self.device)
                 masked_q = q_values.detach().masked_fill(~mask, float('-inf'))
                 action = masked_q.argmax().item()
 
@@ -180,7 +182,7 @@ class SimpleQLearning:
                         state1_tensor = torch.tensor(state1, dtype=torch.float32, device=self.device).unsqueeze(0)
 
                         valid_action_mask = get_valid_action_mask(state1)
-                        mask = torch.tensor(valid_action_mask, dtype=torch.bool)
+                        mask = torch.tensor(valid_action_mask, dtype=torch.bool, device=self.device)
 
                         q_values = target_model(state1_tensor)[0]
                         masked_q = q_values.detach().masked_fill(~mask, float('-inf'))
@@ -245,11 +247,13 @@ class ExperienceReplay(SimpleQLearning):
     def __init__(self, continue_training = False):
         super().__init__()
 
-        self.model = ModelBig().to(self.device)
-        self.target_model = ModelBig().to(self.device)
+        self.model = ModelSmall().to(self.device)
+        self.target_model = ModelSmall().to(self.device)
 
         if continue_training:
             self.continue_training()
+
+        self.eval = False
 
         self.replay_capacity = 100_000
         self.min_replay_size = 10_000
@@ -258,11 +262,13 @@ class ExperienceReplay(SimpleQLearning):
         self.env_step_count: int = 0
         self.train_step_count: int = 0
         self.train_every = 4
-        self.target_sync_every = 1000
+        self.target_sync_every = 2000
 
         self.batch_size = 512
-        self.epochs = 5000
-        self.start_epoch = 0
+
+        self.epochs = 800
+        self.start_epoch = 0# big: 719
+
         self.num_games = 50
         self.num_eval_games = 10
 
@@ -270,10 +276,12 @@ class ExperienceReplay(SimpleQLearning):
         self.epsilon = 0.95
 
     def continue_training(self):
-        self.filename = "NotMade"
+        self.filename = "2026-08-30_11-20-09"
+        self.modelname = "Model_Small_2026-08-30_11-20-09.pt"
+
+        self.writer = SummaryWriter(RUNS_DIR / self.filename)
         dir = MODELS_DIR
-        modelname = "NotMade"
-        path = os.path.join(dir, modelname)
+        path = os.path.join(dir, self.modelname)
         self.model.load_state_dict(torch.load(path, weights_only=True))
         self.model.eval()
 
@@ -290,72 +298,73 @@ class ExperienceReplay(SimpleQLearning):
         valid_action_mask = get_valid_action_mask(state)
 
         if rand.random() < epsilon:
-            return rand.choice([i for i in range(4) if valid_action_mask[i]])
+            return rand.choice([i for i in range(4) if valid_action_mask[i]]), valid_action_mask
 
         with torch.no_grad():
             q_values = model(state_tensor)[0]
-            mask = torch.tensor(valid_action_mask, dtype=torch.bool, device=self.device)
-            masked_q = q_values.detach().masked_fill(~mask, float('-inf'))
-            return masked_q.argmax().item()
+            mask_tensor = torch.tensor(valid_action_mask, dtype=torch.bool, device=self.device)
+            masked_q = q_values.detach().masked_fill(~mask_tensor, float('-inf'))
+            return masked_q.argmax().item(), valid_action_mask
 
     def game_step(self, epsilon):
         game = self.agent.game
         agent = self.agent
 
         state0 = scale_state(game.get_state().copy())
-        action = self.select_action(state0, epsilon)
+        action, mask = self.select_action(state0, epsilon)
+        if not self.eval and game.number_of_moves > 0:
+            self.replay.add_mask_to_previous(mask)
         valid = agent.play(action)
 
         if not valid:
-            valid_mask = get_valid_action_mask(state0)
-            action = self.rand.choice([i for i in range(4) if valid_mask[i]])
+            action = self.rand.choice([i for i in range(4) if mask[i]])
             agent.play(action)
 
         reward = log2(self.agent.memories.total_reward) if self.agent.memories.total_reward != 0 else 0
         done = game.game_over
         state1 = scale_state(game.get_state().copy())
 
-        self.replay.push(state0, action, reward, state1, float(done))
+        if not self.eval:
+            self.replay.push(state0, action, reward, state1, done = float(done))
 
-        return done, game.score, game.number_of_moves
+        return done, game.score, game.number_of_moves, mask
 
     def evaluate(self, e):
+        self.eval = True
         agent = self.agent
         game = self.agent.game
 
         scores, moves = [], []
+        mask = [False]*4
         for _ in range(self.num_games):
             agent.new_game()
             done = False
             while not done:
-                done, score, num_moves = self.game_step(0)
+                done, score, num_moves, mask = self.game_step(0)
             scores.append(game.score)
             moves.append(game.number_of_moves)
 
+        self.eval = False
         self.avg_and_to_tensorboard(None, scores, moves, epoch=e, tag = "t_eval")
 
     def train_step(self):
         if len(self.replay) < self.min_replay_size:
             return None
 
-        states, actions, rewards, next_states, dones = self.replay.sample(self.batch_size)
-
-        masks = torch.tensor(
-            [get_valid_action_mask(s) if not done else [True, True, True, True] for s, done in zip(next_states, dones)],
-            dtype=torch.bool, device=self.device
-        )
+        states, actions, rewards, next_states, next_states_masks, dones = self.replay.sample(self.batch_size)
 
         states = torch.tensor(states, device=self.device)
         actions = torch.tensor(actions, device=self.device)
         rewards = torch.tensor(rewards, device=self.device)
         next_states = torch.tensor(next_states, device=self.device)
+        next_states_masks = torch.tensor(next_states_masks, device=self.device)
         dones = torch.tensor(dones, device=self.device)
 
         q_values = self.model(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
             q_next = self.target_model(next_states)
-            q_next = q_next.masked_fill(~masks, float('-inf'))
+            q_next = q_next.masked_fill(~next_states_masks, float('-inf'))
             next_q_values = q_next.max(dim=1).values
             next_q_values = torch.where(dones.bool(), torch.zeros_like(next_q_values), next_q_values)
             targets = self.targets_reward_function(rewards, next_q_values, dones, self.bellman_discount)
@@ -385,7 +394,7 @@ class ExperienceReplay(SimpleQLearning):
 
         for e in range(self.start_epoch, self.epochs):
             if epsilon > 0.05:
-                epsilon = self.epsilon * (0.999  ** e)
+                epsilon = self.epsilon * (0.9995  ** e)
             else:
                 epsilon = 0.05
 
@@ -393,8 +402,9 @@ class ExperienceReplay(SimpleQLearning):
             for _ in range(self.num_games):
                 agent.new_game()
                 done = False
+                mask = [False]*4
                 while not done:
-                    done, score, num_moves = self.game_step(epsilon)
+                    done, score, num_moves, mask = self.game_step(epsilon)
                     self.env_step_count += 1
                     if self.env_step_count % self.train_every == 0:
                         loss = self.train_step()
