@@ -7,21 +7,19 @@ from typing import Optional
 
 import numpy as np
 import torch
-from pip._internal.models import target_python
 from torch import nn, optim
-from torch.nn import Module
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.Agent import Agent
 from agent.DataManipulator import DataWriter, DataReader, dehash_string
-from agent.Memory import ReplayBuffer
+from agent.Memory import ReplayBuffer, DequeReplayBuffer
 from config import RUNS_DIR, MODELS_DIR
 from game.Helper import get_valid_action_mask
 from models.modelQV1_1 import ModelSmall
 from models.modelQV1_1 import ModelBig
 
 
-def bellman(reward, max_a, discount= 0.95):
+def bellman(reward, max_a, discount= 0.99):
     return reward + discount * max_a
 
 
@@ -49,7 +47,7 @@ class SimpleQLearning:
 
         self.epsilon = 0.95
 
-        self.learning_rate = 1e-3
+        self.learning_rate = 1e-4
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         self.filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -251,9 +249,9 @@ class ExperienceReplay(SimpleQLearning):
         if continue_training:
             self.continue_training()
 
-        self.replay_capacity = 100_000
+        self.replay_capacity = 1_000_000
         self.min_replay_size = 10_000
-        self.replay = ReplayBuffer(self.replay_capacity)
+        self.replay = DequeReplayBuffer(self.replay_capacity)
 
         self.env_step_count: int = 0
         self.train_step_count: int = 0

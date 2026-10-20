@@ -1,6 +1,7 @@
 from collections import deque
 
 import numpy as np
+import torch
 
 from game.Helper import *
 
@@ -163,8 +164,8 @@ class Batch:
         return self.batch
 
 
-class ReplayBuffer:
-    def __init__(self, capacity=200_000):
+class DequeReplayBuffer:
+    def __init__(self, capacity=1_000_000):
         self.buffer = deque(maxlen=capacity)
         self.rand = np.random.default_rng()
 
@@ -184,4 +185,43 @@ class ReplayBuffer:
             np.array(rewards, dtype=np.float32),
             np.array(next_states, dtype=np.float32),
             np.array(dones, dtype=np.float32),
+        )
+
+
+class ReplayBuffer:
+    def __init__(self, capacity=1_000_000):
+        self.cap = capacity
+        self.s = np.zeros((capacity, 16), dtype=np.uint8)
+        self.s1 = np.zeros((capacity, 16), dtype=np.uint8)
+        self.a = np.zeros(capacity, dtype=np.int64)
+        self.r = np.zeros(capacity, dtype=np.float32)
+        self.d = np.zeros(capacity, dtype=np.float32)
+        self.m1 = np.ones((capacity, 4), dtype=np.bool_)
+        self.i = 0
+        self.n = 0
+        self.rand = np.random.default_rng()
+
+    def __len__(self):
+        return self.n
+
+    def push(self, state, action, reward, next_state, done, next_mask=None):
+        i = self.i
+        self.s[i] = np.asarray(state).reshape(16)
+        self.s1[i] = np.asarray(next_state).reshape(16)
+        self.a[i] = action
+        self.r[i] = reward
+        self.d[i] = done
+        self.m1[i] = True if (done or next_mask is None) else next_mask
+        self.i = (i + 1) % self.cap
+        self.n = min(self.n + 1, self.cap)
+
+    def sample(self, batch_size, device):
+        idx = self.rand.integers(0, self.n, batch_size)
+        return (
+            torch.from_numpy(self.s[idx]).to(device),
+            torch.from_numpy(self.a[idx]).to(device),
+            torch.from_numpy(self.r[idx]).to(device),
+            torch.from_numpy(self.s1[idx]).to(device),
+            torch.from_numpy(self.d[idx]).to(device),
+            torch.from_numpy(self.m1[idx]).to(device),
         )

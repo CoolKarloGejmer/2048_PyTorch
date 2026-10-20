@@ -1,8 +1,8 @@
-from pandas.io.sas.sas_constants import row_length_offset_multiplier
-
 from game.Direction import Direction
 
 import numpy as np
+
+DIRECTIONS = [Direction(i) for i in range(4)]
 
 #transposes 2d array
 def transpose(array: list[list[int]] | list[list[bool]]):
@@ -106,22 +106,40 @@ def get_valid_action_mask(state):
         mask[action] = check_if_valid(action, state.copy())
     return mask
 
-def example_new(direction, state):
-    state = np.asarray(state)
-    dim = len(state)
+def valid_mask_np(state):
+    zero = state == 0
+    # are there neighbouring tiles with same values
+    # and are they non-empty (non-zero)
+    horizontal_merge_mask = (((state[:,:-1] == state[:,1:])) & ~zero[:,1:]).any()
+    vertical_merge_mask = (((state[:-1,:] == state[1:,:])) & ~zero[1:,:]).any()
+    # ~zero just means that cell is non-empty
+    # this is important because the non-empty becomes true
+    # we want to match empty cells with non-empty ones in specific direction
+    # if the cell to the right is non-empty and left is empty, the board can move left
+    can_left = (zero[:,:-1] & ~zero[:,1:]).any()
+    can_right = (~zero[:,:-1] & zero[:,1:]).any()
+    can_up = (zero[:-1,:] & ~zero[1:,:]).any()
+    can_down = (~zero[:-1,:] & zero[1:,:]).any()
+    return np.array([
+        vertical_merge_mask or can_up,
+        horizontal_merge_mask or can_right,
+        vertical_merge_mask or can_down,
+        horizontal_merge_mask or can_left
+    ])
 
-    if direction == Direction.UP or direction == Direction.DOWN:
-        state = state.transpose()
-
-    for row_indx in range(dim):
-        row = state[row_indx].tolist()
-        row, score = solve_row(direction, row.copy())
-        state[row_indx] = row
-
-    if direction == Direction.UP or direction == Direction.DOWN:
-        state = state.transpose()
-
-    return state
+def apply_move(state, action):
+    direction = DIRECTIONS[action]
+    vertical = action == 0 or action == 2
+    rows = state.T if vertical else state
+    new = np.empty_like(rows)
+    reward = 0
+    for i in range(4):
+        row, _, score = solve_row(direction, rows[i].tolist())
+        new[i] = row
+        reward += score
+    if vertical:
+        new = new.T
+    return np.ascontiguousarray(new), reward
 
 class Deprecated:
     # checks if row is solved or not
