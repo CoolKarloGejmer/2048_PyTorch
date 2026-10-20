@@ -2,8 +2,6 @@ from game.Direction import Direction
 
 import numpy as np
 
-DIRECTIONS = [Direction(i) for i in range(4)]
-
 #transposes 2d array
 def transpose(array: list[list[int]] | list[list[bool]]):
     dim=len(array)
@@ -79,6 +77,32 @@ def solve_row(direction: Direction, row: list[int]):
 
     return row, zeros, score
 
+# function for solving a row to the left
+# can be used only if the board/row is expressed
+# as exponents instead of numbers
+def solve_row_exponent(row):
+    non_zeros = row[row != 0]
+
+    new_row = []
+    score_gained = 0
+    i = 0
+
+    while i < len(non_zeros):
+        if i + 1 < len(non_zeros) and non_zeros[i] == non_zeros[i + 1]:
+            new_exp = int(non_zeros[i]) + 1
+            new_row.append(new_exp)
+            score_gained += (1 << new_exp)
+            i += 2
+        else:
+            new_row.append(non_zeros[i])
+            i += 1
+
+    new_row = np.array(new_row, dtype=np.uint8)
+    padded = np.zeros(4, dtype=np.uint8)
+    padded[:len(new_row)] = new_row
+
+    return padded, score_gained
+
 def check_if_valid(direction: Direction | int, state) -> bool:
     old_state = state.copy()
 
@@ -105,41 +129,6 @@ def get_valid_action_mask(state):
     for action in range(4):
         mask[action] = check_if_valid(action, state.copy())
     return mask
-
-def valid_mask_np(state):
-    zero = state == 0
-    # are there neighbouring tiles with same values
-    # and are they non-empty (non-zero)
-    horizontal_merge_mask = (((state[:,:-1] == state[:,1:])) & ~zero[:,1:]).any()
-    vertical_merge_mask = (((state[:-1,:] == state[1:,:])) & ~zero[1:,:]).any()
-    # ~zero just means that cell is non-empty
-    # this is important because the non-empty becomes true
-    # we want to match empty cells with non-empty ones in specific direction
-    # if the cell to the right is non-empty and left is empty, the board can move left
-    can_left = (zero[:,:-1] & ~zero[:,1:]).any()
-    can_right = (~zero[:,:-1] & zero[:,1:]).any()
-    can_up = (zero[:-1,:] & ~zero[1:,:]).any()
-    can_down = (~zero[:-1,:] & zero[1:,:]).any()
-    return np.array([
-        vertical_merge_mask or can_up,
-        horizontal_merge_mask or can_right,
-        vertical_merge_mask or can_down,
-        horizontal_merge_mask or can_left
-    ])
-
-def apply_move(state, action):
-    direction = DIRECTIONS[action]
-    vertical = action == 0 or action == 2
-    rows = state.T if vertical else state
-    new = np.empty_like(rows)
-    reward = 0
-    for i in range(4):
-        row, _, score = solve_row(direction, rows[i].tolist())
-        new[i] = row
-        reward += score
-    if vertical:
-        new = new.T
-    return np.ascontiguousarray(new), reward
 
 class Deprecated:
     # checks if row is solved or not

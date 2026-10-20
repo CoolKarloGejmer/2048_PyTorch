@@ -1,13 +1,13 @@
 from multiprocessing.spawn import prepare
 
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 from agent.DataManipulator import DataWriter, DataReader, dehash_string, hash_state
 
 
 class DataDriven:
     def __init__(self):
 
-        self.agent = Agent()
+        self.agent = AgentV1()
 
         self.data_writer = DataWriter()
 

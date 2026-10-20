@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 from config import DATA_DIR
 from game.Direction import Direction
 
@@ -306,7 +306,7 @@ class DataWriter(DataManipulator):
 
         if best_action is None or reward is None:
             state = dehash_string(hashed_state)
-            best_action, reward = Agent().best_move(state)
+            best_action, reward = AgentV1().best_move(state)
 
         # save the state and its rotations
         already_exists = self.save_state(hashed_state, best_action, reward, dim)

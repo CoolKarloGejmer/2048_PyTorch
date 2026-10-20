@@ -10,7 +10,7 @@ import torch
 from torch import nn, optim
 from torch.utils.tensorboard import SummaryWriter
 
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 from agent.DataManipulator import DataWriter, DataReader, dehash_string
 from agent.Memory import ReplayBuffer, DequeReplayBuffer
 from config import RUNS_DIR, MODELS_DIR
@@ -39,7 +39,7 @@ class SimpleQLearning:
         self.target_model = ModelSmall().to(self.device)
         self.loss_fn = nn.HuberLoss().to(self.device)
 
-        self.agent = Agent(max_deltas=1, batch_size=1, evaluation_mode=False)
+        self.agent = AgentV1(max_deltas=1, batch_size=1, evaluation_mode=False)
         self.rand = np.random.default_rng()
 
         self.start_epoch = 1835
@@ -112,7 +112,7 @@ class SimpleQLearning:
 
     def prepare_data(self):
         data_saver = self.data_writer
-        agent = Agent()
+        agent = AgentV1()
 
         for hashed_string in self.states_set:
             if not data_saver.exists(hashed_string):

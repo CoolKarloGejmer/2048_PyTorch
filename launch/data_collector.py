@@ -1,4 +1,4 @@
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 from agent.DataManipulator import DataReader, DataWriter, hash_state, dehash_string
 import numpy.random as rand
 
@@ -8,7 +8,7 @@ class DataCollector:
         # number of games agent is using to get the "best moves"
         self.num_games = 3
 
-        self.agent = Agent()
+        self.agent = AgentV1()
 
         self.data_writer = DataWriter()
         self.data_reader = DataReader()

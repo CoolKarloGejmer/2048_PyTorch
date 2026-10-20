@@ -6,8 +6,9 @@ from game.Direction import Direction
 from game.Game import Game
 from game.Helper import get_valid_action_mask
 
+DIRECTIONS = [Direction(i) for i in range(4)]
 
-class Agent:
+class AgentV1:
     def __init__(self, game=None, dim=4, seed=None, batch_size=128, max_deltas=7,
                  evaluation_mode=True, sort_memories: bool = True):
         self.evaluation_mode = evaluation_mode
@@ -155,3 +156,8 @@ class Agent:
 
     def get_state(self):
         return self.game.get_state()
+
+# adapted for gpu
+class AgentV2:
+    def act(self, states, mask):
+        return

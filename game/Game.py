@@ -50,7 +50,7 @@ class Game:
         idx = rand.integers(low = 0, high = n_empty)
         row, col = empty_pos[0][idx], empty_pos[1][idx]
 
-        self.game_array[row][col] = 4 if rand.random() < 0.5 else 2
+        self.game_array[row][col] = 4 if rand.random() < 0.1 else 2
 
         self.has_empty_spots = n_empty > 1
 

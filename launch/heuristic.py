@@ -1,4 +1,4 @@
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 from agent.DataManipulator import DataWriter, DataReader, dehash_string, hash_state
 import numpy.random as rand
 from torch.utils.tensorboard import SummaryWriter
@@ -7,7 +7,7 @@ from game.Direction import Direction
 from game.Game import Game
 
 
-class HeuristicAgent_V1(Agent):
+class HeuristicAgent_V1(AgentV1):
     def __init__(self):
         super().__init__(evaluation_mode=True)
 

@@ -2,6 +2,7 @@ import cProfile
 
 from agent.DataManipulator import DataManipulator
 from game.Direction import Direction
+from game.Env import Env, valid_mask_np, apply_move
 from launch import data_collector
 from launch.classification import Classification, ClassificationDataCollector, ClassificationRuntime
 from launch.command_line import CommandLine
@@ -12,6 +13,7 @@ from launch.data_collector import DataCollector
 from launch.heuristic import Heuristic
 
 from agent.DataManipulator import DataReader
+import numpy as np
 
 def command_line():
     cmd = CommandLine()
@@ -42,6 +44,4 @@ def q_learning():
     q.main()
 
 if __name__ == "__main__":
-    q_learning()
-    #data()
-    #command_line()
+    print(np.arange(10))

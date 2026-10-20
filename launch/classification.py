@@ -41,7 +41,7 @@ class Classification:
         self.momentum = 0.9
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
 
-        self.agent = Agent(batch_size=self.batch_size, max_deltas=self.max_deltas, sort_memories=True)
+        self.agent = AgentV1(batch_size=self.batch_size, max_deltas=self.max_deltas, sort_memories=True)
 
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.writer = SummaryWriter(f'runs/{self.timestamp}')
@@ -119,7 +119,7 @@ class Classification:
         avg_score = []
         num_moves = []
 
-        agent = Agent(evaluation_mode=True)
+        agent = AgentV1(evaluation_mode=True)
         game = agent.game
 
         with torch.no_grad():
@@ -259,7 +259,7 @@ class ClassificationDataCollector(Classification):
         self.momentum = 0.9
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=self.momentum)
 
-        self.agent = Agent(batch_size=self.batch_size, max_deltas=7, sort_memories=False, evaluation_mode=True)
+        self.agent = AgentV1(batch_size=self.batch_size, max_deltas=7, sort_memories=False, evaluation_mode=True)
 
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.writer = SummaryWriter(RUNS_DIR / self.timestamp)

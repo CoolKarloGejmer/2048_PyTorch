@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
-from agent.Agent import Agent
+from agent.Agents import AgentV1
 
 
 class Random:
@@ -12,7 +12,7 @@ class Random:
         self.scores = []
         self.moves = []
 
-        self.agent = Agent(evaluation_mode=True)
+        self.agent = AgentV1(evaluation_mode=True)
 
         self.writer = SummaryWriter(f'runs/Random_Moves')
 
