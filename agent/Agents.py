@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from agent.Memory import Memories, Batch
+from agent.Memory import Memories, Batch, ReplayBuffer
 from game.Direction import Direction
 from game.Game import Game
 from game.Helper import get_valid_action_mask
@@ -159,5 +159,16 @@ class AgentV1:
 
 # adapted for gpu
 class AgentV2:
-    def act(self, states, mask):
-        return
+    def __init__(self, rng = None):
+        self.rand = np.random.default_rng(rng)
+
+    def act(self, one_hot_states, masks, model):
+        actions = np.empty_like(len(masks),dtype = np.uint8)
+        with torch.no_grad():
+            for state, mask, i in one_hot_states, masks, range(len(masks)):
+                q_values = model(state.unsqueeze(0))[0]
+                mask_tensor = torch.tensor(mask, dtype=torch.float32)
+                masked_q = q_values.detach().masked_fill_(~mask_tensor, float('-inf'))
+                actions[i] = masked_q.argmax().item()
+        assert masks[np.arange(len(actions)),actions].all()
+        return actions

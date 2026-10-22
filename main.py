@@ -2,7 +2,7 @@ import cProfile
 
 from agent.DataManipulator import DataManipulator
 from game.Direction import Direction
-from game.Env import Env, valid_mask_np, apply_move
+from game.Env import Env, valid_mask_np, apply_move, ParallelEnvs
 from launch import data_collector
 from launch.classification import Classification, ClassificationDataCollector, ClassificationRuntime
 from launch.command_line import CommandLine
@@ -40,8 +40,9 @@ def data():
     data_driven.play_game()
 
 def q_learning():
-    q = ExperienceReplay(continue_training=True)
+    q = ExperienceReplay(continue_training=False)
     q.main()
 
 if __name__ == "__main__":
-    print(np.arange(10))
+    envs = ParallelEnvs()
+    envs.main()

@@ -196,8 +196,9 @@ class DequeReplayBuffer:
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=1_000_000):
+    def __init__(self, capacity=500_000, channels = 15):
         self.cap = capacity
+        self.channels = channels
         self.s = np.zeros((capacity, 16), dtype=np.uint8)
         self.s1 = np.zeros((capacity, 16), dtype=np.uint8)
         self.a = np.zeros(capacity, dtype=np.int64)
@@ -221,6 +222,7 @@ class ReplayBuffer:
         self.m1[i] = True if (done or next_mask is None) else next_mask
         self.i = (i + 1) % self.cap
         self.n = min(self.n + 1, self.cap)
+        assert self.s.max() < self.channels and self.s1.max() < self.channels
 
     def sample(self, batch_size, device):
         idx = self.rand.integers(0, self.n, batch_size)

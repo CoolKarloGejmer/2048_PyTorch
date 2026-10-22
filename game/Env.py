@@ -1,3 +1,5 @@
+import numpy as np
+
 from game.Helper import *
 
 DIRECTIONS = [Direction(i) for i in range(4)]
@@ -36,6 +38,19 @@ def apply_move(state, action):
     if vertical:
         new = new.T
     return np.ascontiguousarray(new), reward
+
+def build_lut(channels = 16, dim=4):
+    entries = channels**dim
+
+    rows = np.zeros((entries, dim), dtype=np.uint8)
+    scores = np.zeros(entries, dtype=np.int32)
+    grid = np.indices((channels,)*dim).reshape(dim,-1).T
+
+    for key in range(entries):
+        rows[key], scores[key] = solve_row_exponent(grid[key])
+
+    powers = channels ** np.arange(dim-1,-1,-1,dtype=np.int64)
+    return rows, scores, powers
 
 class Env:
     def __init__(self, rng = None):
@@ -88,32 +103,24 @@ class Env:
         return self.state(), reward, self.done
 
 class ParallelEnvs:
-    def __init__(self, num_games=32, rng=None):
-        self.K = num_games
+    def __init__(self, k= 32, rng=None, channels=16, dim = 4):
+        self.K = k
         self.rng = np.random.default_rng(rng)
 
-        self.boards = np.zeros((self.K, 4, 4), dtype=np.uint8)
+        self.boards = np.zeros((self.K, dim, dim), dtype=np.uint8)
         self.scores = np.zeros(self.K, dtype=np.float32)
         self.moves = np.zeros(self.K, dtype=np.int32)
         self.dones = np.zeros(self.K, dtype=bool)
         self.masks = np.zeros((self.K, 4), dtype=bool)
+
         self.reset()
+        self.lut = (build_lut(channels, dim))
 
-    def reset(self, indices=None):
-        if indices is None:
-            indices = np.arange(self.K)
-        indices = np.asarray(indices, dtype=np.int64)
+    def _get_key_batch(self, boards = None):
+        if boards is None:
+            boards = self.boards
 
-        self.boards[indices] = 0
-        self.scores[indices] = 0
-        self.moves[indices] = 0
-        self.dones[indices] = False
-
-        self._populate(indices)
-        self._populate(indices)
-
-        self.masks[indices] = self._get_valid_mask_batch(self.boards[indices])
-        return self.boards[indices].reshape(-1, 16)
+        return boards @ self.lut[2]
 
     def _populate(self, indices=None):
         if indices is None:
@@ -150,45 +157,62 @@ class ParallelEnvs:
             horizontal_merge_masks | can_lefts
         ], axis=-1)
 
+    def reset(self, indices=None):
+        if indices is None:
+            indices = np.arange(self.K)
+        indices = np.asarray(indices, dtype=np.int64)
+
+        self.boards[indices] = 0
+        self.scores[indices] = 0
+        self.moves[indices] = 0
+        self.dones[indices] = False
+
+        self._populate(indices)
+        self._populate(indices)
+
+        self.masks[indices] = self._get_valid_mask_batch(self.boards[indices])
+        return self.boards[indices].reshape(-1, 16)
+
+    def move_batch(self, actions):
+        rewards = np.zeros(self.K, dtype=np.float32)
+        rows, scores, _ = self.lut
+
+        for action in range(len(DIRECTIONS)):
+            indices = np.flatnonzero(actions == action)
+
+            if indices.size == 0:
+                continue
+            boards = self.boards[indices]
+            if action == 0:
+                rotated = boards.transpose(0, 2, 1)
+            elif action == 1:
+                rotated = boards[:, :, ::-1]
+            elif action == 2:
+                rotated = boards.transpose(0, 2, 1)[:, :, ::-1]
+            else:
+                rotated = boards
+
+            keys = self._get_key_batch(rotated)
+            new = rows[keys]
+
+            if action == 0:
+                new = new.transpose(0, 2, 1)
+            elif action == 1:
+                new = new[:, :, ::-1]
+            elif action == 2:
+                new = new[:, :, ::-1].transpose(0, 2, 1)
+
+            self.boards[indices] = new
+            rewards[indices] = scores[keys].sum(axis=1)
+
+        return rewards
+
     def step(self, actions):
         assert not self.dones.any()
         actions = np.asarray(actions)
         assert self.masks[np.arange(self.K), actions].all()
 
-        rewards = np.zeros(self.K, dtype=np.float32)
-
-        for i in range(self.K):
-            board = self.boards[i]
-            action = actions[i]
-
-            if action == 0:
-                working_board = board.T
-            elif action == 2:
-                working_board = board.T[:, ::-1]
-            elif action == 1:
-                working_board = board[:, ::-1]
-            else:
-                working_board = board
-
-            new_rows = []
-            move_reward = 0
-            for r in range(4):
-                solved_row, score_gain = solve_row_exponent(working_board[r])
-                new_rows.append(solved_row)
-                move_reward += score_gain
-
-            working_board = np.array(new_rows, dtype=np.uint8)
-
-            if action == 0:
-                board[:] = working_board.T
-            elif action == 2:
-                board[:] = working_board[:, ::-1].T
-            elif action == 1:
-                board[:] = working_board[:, ::-1]
-            else:
-                board[:] = working_board
-
-            rewards[i] = move_reward
+        rewards = self.move_batch(actions)
 
         self.scores += rewards
         self.moves += 1
