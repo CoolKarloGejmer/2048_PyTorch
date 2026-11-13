@@ -3,10 +3,10 @@ import torch.nn.functional as F
 
 
 class ModelSmall(nn.Module):
-    def __init__(self):
+    def __init__(self, channels, dim):
         super(ModelSmall, self).__init__()
 
-        self.lin1 = nn.Linear(4 * 4, 128)
+        self.lin1 = nn.Linear(channels * dim * dim, 128)
 
         self.lin2 = nn.Linear(128, 256)
 
@@ -26,7 +26,7 @@ class ModelBig(nn.Module):
     def __init__(self):
         super(ModelBig, self).__init__()
 
-        self.lin1 = nn.Linear(4 * 4, 128)
+        self.lin1 = nn.Linear(16 * 4 * 4, 128)
 
         self.lin2 = nn.Linear(128, 256)
 

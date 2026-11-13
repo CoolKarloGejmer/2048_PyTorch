@@ -103,9 +103,10 @@ class Env:
         return self.state(), reward, self.done
 
 class ParallelEnvs:
-    def __init__(self, k= 32, rng=None, channels=16, dim = 4):
+    def __init__(self, k = 256, rng=None, channels=16, dim = 4):
         self.K = k
         self.rng = np.random.default_rng(rng)
+        self.dim = dim
 
         self.boards = np.zeros((self.K, dim, dim), dtype=np.uint8)
         self.scores = np.zeros(self.K, dtype=np.float32)
@@ -156,6 +157,19 @@ class ParallelEnvs:
             vertical_merge_masks | can_downs,
             horizontal_merge_masks | can_lefts
         ], axis=-1)
+
+    def get_boards(self, indices = None, flat = True):
+        if indices is None:
+            indices = np.arange(self.K)
+        if flat:
+            return self.boards[indices].reshape((-1, self.dim*self.dim))
+        else:
+            return self.get_boards(indices)
+
+    def get_masks(self, indices = None):
+        if indices is None:
+            indices = np.arange(self.K)
+        return self.masks[indices]
 
     def reset(self, indices=None):
         if indices is None:
