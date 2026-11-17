@@ -7,6 +7,7 @@ from launch import data_collector
 from launch.classification import Classification, ClassificationDataCollector, ClassificationRuntime
 from launch.command_line import CommandLine
 from launch.data_driven import DataDriven
+from launch.double_dqn import DoubleDQN
 from launch.q_learning import SimpleQLearning, ExperienceReplay
 from launch.random_game import Random
 from launch.data_collector import DataCollector
@@ -43,6 +44,9 @@ def q_learning():
     q = ExperienceReplay(continue_training=False)
     q.main()
 
+def double_dqn(seed = None):
+    double = DoubleDQN(rng_seed=seed)
+    double.main()
+
 if __name__ == "__main__":
-    envs = ParallelEnvs()
-    envs.main()
+    double_dqn(42)

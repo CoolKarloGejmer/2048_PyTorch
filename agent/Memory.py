@@ -165,9 +165,9 @@ class Batch:
 
 
 class DequeReplayBuffer:
-    def __init__(self, capacity=1_000_000):
+    def __init__(self, capacity=1_000_000, seed = None):
         self.buffer = deque(maxlen=capacity)
-        self.rand = np.random.default_rng()
+        self.rand = np.random.default_rng(seed)
 
     def __len__(self):
         return len(self.buffer)
@@ -194,9 +194,8 @@ class DequeReplayBuffer:
             np.array(dones, dtype=np.float32),
         )
 
-
 class ReplayBuffer:
-    def __init__(self, capacity=500_000, channels = 15):
+    def __init__(self, capacity=500_000, channels=16, seed = None):
         self.cap = capacity
         self.channels = channels
         self.s = np.zeros((capacity, 16), dtype=np.uint8)
@@ -207,10 +206,26 @@ class ReplayBuffer:
         self.m1 = np.ones((capacity, 4), dtype=np.bool_)
         self.i = 0
         self.n = 0
-        self.rand = np.random.default_rng()
+        self.rand = np.random.default_rng(seed)
 
     def __len__(self):
         return self.n
+
+    def push_batch(self, states, actions, rewards, next_states, dones, next_masks):
+        n = len(actions)
+        states = np.asarray(states).reshape(n, 16)
+        next_states = np.asarray(next_states).reshape(n, 16)
+        assert states.max() < self.channels and next_states.max() < self.channels
+        dones = np.asarray(dones, dtype=bool)
+        idx = (self.i + np.arange(n)) % self.cap
+        self.s[idx] = states
+        self.s1[idx] = next_states
+        self.a[idx] = actions
+        self.r[idx] = rewards
+        self.d[idx] = dones
+        self.m1[idx] = np.where(dones[:, None], True, next_masks)
+        self.i = (self.i + n) % self.cap
+        self.n = min(self.n + n, self.cap)
 
     def push(self, state, action, reward, next_state, done, next_mask=None):
         i = self.i
@@ -224,7 +239,8 @@ class ReplayBuffer:
         self.n = min(self.n + 1, self.cap)
         assert self.s.max() < self.channels and self.s1.max() < self.channels
 
-    def sample(self, batch_size, device):
+    def sample(self, batch_size, device) \
+            -> tuple[torch.Tensor,torch.Tensor,torch.Tensor,torch.Tensor,torch.Tensor,torch.Tensor]:
         idx = self.rand.integers(0, self.n, batch_size)
         return (
             torch.from_numpy(self.s[idx]).to(device),

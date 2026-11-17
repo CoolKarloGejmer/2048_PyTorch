@@ -163,12 +163,11 @@ class AgentV2:
         self.rand = np.random.default_rng(rng)
 
     def act(self, one_hot_states, masks, model):
-        actions = np.empty_like(len(masks),dtype = np.uint8)
+        actions = np.full(len(masks), 5 ,dtype = np.uint8)
         with torch.no_grad():
-            for state, mask, i in one_hot_states, masks, range(len(masks)):
+            for state, mask, i in zip(one_hot_states, torch.tensor(masks, dtype=torch.bool), range(len(masks))):
                 q_values = model(state.unsqueeze(0))[0]
-                mask_tensor = torch.tensor(mask, dtype=torch.float32)
-                masked_q = q_values.detach().masked_fill_(~mask_tensor, float('-inf'))
+                masked_q = q_values.detach().masked_fill_(~mask, float('-inf'))
                 actions[i] = masked_q.argmax().item()
         assert masks[np.arange(len(actions)),actions].all()
         return actions

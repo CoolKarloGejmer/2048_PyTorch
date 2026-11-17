@@ -15,8 +15,7 @@ from agent.DataManipulator import DataWriter, DataReader, dehash_string
 from agent.Memory import ReplayBuffer, DequeReplayBuffer
 from config import RUNS_DIR, MODELS_DIR
 from game.Helper import get_valid_action_mask
-from models.modelQV1_1 import ModelSmall
-from models.modelQV1_1 import ModelBig
+from models.Models import ModelQ1_1 as ModelSmall, ModelQ1_2 as ModelBig
 
 
 def bellman(reward, max_a, discount= 0.99):

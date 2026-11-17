@@ -157,6 +157,16 @@ class ParallelEnvs:
             horizontal_merge_masks | can_lefts
         ], axis=-1)
 
+    def get_boards(self, indices = None):
+        if indices is not None:
+            return self.boards[indices]
+        return self.boards
+
+    def get_masks(self, indices = None):
+        if indices is not None:
+            return self.masks[indices]
+        return self.masks
+
     def reset(self, indices=None):
         if indices is None:
             indices = np.arange(self.K)

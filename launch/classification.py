@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.DataManipulator import *
 from agent.Memory import Memory
-from models.modelV1_1 import Model
+from models.Models import ModelV1_1
 
 from config import MODELS_DIR, RUNS_DIR
 
