@@ -1,5 +1,3 @@
-import numpy as np
-
 from game.Helper import *
 
 
@@ -23,6 +21,7 @@ class Game:
         self.game_over: bool = False
         self.has_empty_spots: bool = True
 
+        self.populate()
         self.populate()
 
     def __setstate__(self, state):

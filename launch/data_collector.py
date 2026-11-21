@@ -1,6 +1,7 @@
+import numpy.random as rand
+
 from agent.Agents import AgentV1
 from agent.DataManipulator import DataReader, DataWriter, hash_state, dehash_string
-import numpy.random as rand
 
 
 class DataCollector:

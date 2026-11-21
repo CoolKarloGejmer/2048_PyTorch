@@ -1,4 +1,3 @@
-import cProfile
 import os
 from datetime import datetime
 from math import log2
@@ -11,11 +10,11 @@ from torch import nn, optim
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.Agents import AgentV1
-from agent.DataManipulator import DataWriter, DataReader, dehash_string
-from agent.Memory import ReplayBuffer, DequeReplayBuffer
+from agent.DataManipulator import DataWriter, dehash_string
+from agent.Memory import DequeReplayBuffer
 from config import RUNS_DIR, MODELS_DIR
 from game.Helper import get_valid_action_mask
-from models.Models import ModelQ1_1 as ModelSmall, ModelQ1_2 as ModelBig
+from models.Models import ModelQ1_1 as ModelSmall
 
 
 def bellman(reward, max_a, discount= 0.99):

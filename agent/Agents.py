@@ -1,10 +1,9 @@
 import numpy as np
 import torch
 
-from agent.Memory import Memories, Batch, ReplayBuffer
+from agent.Memory import Memories, Batch
 from game.Direction import Direction
 from game.Game import Game
-from game.Helper import get_valid_action_mask
 
 DIRECTIONS = [Direction(i) for i in range(4)]
 
@@ -163,11 +162,16 @@ class AgentV2:
         self.rand = np.random.default_rng(rng)
 
     def act(self, one_hot_states, masks, model):
-        actions = np.full(len(masks), 5 ,dtype = np.uint8)
         with torch.no_grad():
-            for state, mask, i in zip(one_hot_states, torch.tensor(masks, dtype=torch.bool), range(len(masks))):
-                q_values = model(state.unsqueeze(0))[0]
-                masked_q = q_values.detach().masked_fill_(~mask, float('-inf'))
-                actions[i] = masked_q.argmax().item()
-        assert masks[np.arange(len(actions)),actions].all()
+            q_values = model(one_hot_states)
+            masks = torch.as_tensor(masks, dtype=torch.bool, device=q_values.device)
+            actions = q_values.masked_fill(~masks, float('-inf')).argmax(dim=1).cpu().numpy()
+        assert masks[np.arange(len(actions)), actions].all()
         return actions
+
+    def get_rand_actions(self, k, epsilon, masks):
+        explore = self.rand.random(k) < epsilon
+        r = self.rand.random((k, 4))
+        r[~masks] = -1.0
+        actions = np.where(explore, r.argmax(axis=1), -1)
+        return actions, np.flatnonzero(~explore)

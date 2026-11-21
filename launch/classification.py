@@ -6,9 +6,6 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.DataManipulator import *
-from agent.Memory import Memory
-from models.Models import ModelV1_1
-
 from config import MODELS_DIR, RUNS_DIR
 
 

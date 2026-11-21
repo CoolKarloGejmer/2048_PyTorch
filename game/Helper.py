@@ -1,6 +1,7 @@
+import numpy as np
+
 from game.Direction import Direction
 
-import numpy as np
 
 #transposes 2d array
 def transpose(array: list[list[int]] | list[list[bool]]):

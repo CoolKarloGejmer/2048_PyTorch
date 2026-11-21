@@ -1,8 +1,8 @@
-from agent.Agents import AgentV1
-from agent.DataManipulator import DataWriter, DataReader, dehash_string, hash_state
 import numpy.random as rand
 from torch.utils.tensorboard import SummaryWriter
 
+from agent.Agents import AgentV1
+from agent.DataManipulator import DataWriter, DataReader, dehash_string, hash_state
 from game.Direction import Direction
 from game.Game import Game
 

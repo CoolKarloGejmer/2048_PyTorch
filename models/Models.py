@@ -92,8 +92,10 @@ class ModelQ1_2(nn.Module):
 class ModelQ2_1(nn.Module):
     def __init__(self, dim=4, channels = 16):
         super(ModelQ2_1, self).__init__()
+        self.dim = dim
+        self.channels = channels
 
-        self.inpt = nn.Linear(dim*dim*channels, 128)
+        self.inpt = nn.Linear(self.dim*self.dim*self.channels, 128)
 
         self.lin1 = nn.Linear(128, 256)
 
@@ -104,7 +106,7 @@ class ModelQ2_1(nn.Module):
         self.out = nn.Linear(128, 4)
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
+        x = x.reshape((x.size(0),-1))
         x = F.relu(self.inpt(x))
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))

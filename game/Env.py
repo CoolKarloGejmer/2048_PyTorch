@@ -103,9 +103,10 @@ class Env:
         return self.state(), reward, self.done
 
 class ParallelEnvs:
-    def __init__(self, k= 32, rng=None, channels=16, dim = 4):
+    def __init__(self, k= 32, seed=None, channels=16, dim = 4):
         self.K = k
-        self.rng = np.random.default_rng(rng)
+        self.rng = np.random.default_rng(seed)
+        self.dim = dim
 
         self.boards = np.zeros((self.K, dim, dim), dtype=np.uint8)
         self.scores = np.zeros(self.K, dtype=np.float32)
@@ -157,15 +158,33 @@ class ParallelEnvs:
             horizontal_merge_masks | can_lefts
         ], axis=-1)
 
-    def get_boards(self, indices = None):
-        if indices is not None:
-            return self.boards[indices]
-        return self.boards
+    def get_boards(self, indices = None, flat = True):
+        if indices is None:
+            indices = np.arange(self.K)
+        if flat:
+            return self.boards[indices].reshape((-1, self.dim*self.dim))
+        else:
+            return self.get_boards(indices)
 
     def get_masks(self, indices = None):
-        if indices is not None:
-            return self.masks[indices]
-        return self.masks
+        if indices is None:
+            indices = np.arange(self.K)
+        return self.masks[indices]
+
+    def get_moves(self, indices = None):
+        if indices is None:
+            indices = np.arange(self.K)
+        return self.moves[indices]
+
+    def get_scores(self, indices = None):
+        if indices is None:
+            indices = np.arange(self.K)
+        return self.scores[indices]
+
+    def get_dones(self, indices = None):
+        if indices is None:
+            indices = np.arange(self.K)
+        return self.dones[indices]
 
     def reset(self, indices=None):
         if indices is None:
@@ -232,3 +251,15 @@ class ParallelEnvs:
         self.dones = ~self.masks.any(axis=1)
 
         return self.boards.reshape(self.K, 16).copy(), rewards, self.dones.copy()
+
+    def eval_step(self, actions, indices_to_update):
+        rewards = self.move_batch(actions)
+
+        self.scores += rewards
+        self.moves[indices_to_update] += 1
+
+        self._populate(indices_to_update)
+        self.masks = self._get_valid_mask_batch()
+        self.dones = ~self.masks.any(axis=1)
+
+        return self.dones.all()
